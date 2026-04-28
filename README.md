@@ -5,7 +5,7 @@ LogPulse Analytics is a modern, high-performance dashboard designed to visualize
 ## 🚀 Features
 
 - **Privacy-First**: All log processing happens 100% locally in your browser. No data is uploaded to any server.
-- **Universal Parsing**: Supports JSON Lines (GCP/Zap), TSV/CSV (Nginx/CloudFront), Kubernetes (CRI), PostgreSQL, Redis, MongoDB, and more.
+- **Universal Parsing**: Expanded support! Now deeply parses Nginx, GCP, AWS ALB, Kubernetes, PostgreSQL, MongoDB, Redis, Spring Boot, Envoy, and CloudFront access logs.
 - **AI Integration**:
   - **Google Gemini**: Cloud-based analysis.
   - **Ollama**: **NEW!** Local LLM support for privacy-conscious users.
@@ -50,7 +50,17 @@ To use the local AI features:
 
 ## 🛠️ Local Development
 
-```bash
-npm install
-npm run dev
-```
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+
+3. **Configure AI (Optional)**:
+   - Click the gear icon to open **Settings**.
+   - Choose between **Google Gemini** (requires API key) or **Ollama** (requires local installation).
+   - Follow the in-app instructions to configure your chosen AI provider for insightful log analysis.
