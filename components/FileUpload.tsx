@@ -3,7 +3,7 @@ import { UploadCloud, FileText, Globe, Server, Code, Database, Zap, Clipboard, L
 import { unzipSync, gunzipSync } from 'fflate';
 
 interface FileUploadProps {
-  onDataLoaded: (content: string) => void;
+  onDataLoaded: (content: string, isAppend?: boolean) => void;
 }
 
 const SAMPLE_LOGS: Record<string, string> = {
@@ -84,31 +84,189 @@ java.lang.NullPointerException: null
 
 const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [activeTab, setActiveTab] = useState<'upload' | 'paste'>('upload');
+  const [activeTab, setActiveTab] = useState<'upload' | 'paste' | 'stream'>('upload');
   const [textInput, setTextInput] = useState('');
+  const [streamUrl, setStreamUrl] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Ref to hold polling interval
+  const pollingRef = useRef<number | null>(null);
+
+  const stopStreaming = () => {
+      setIsStreaming(false);
+      if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+      }
+  };
+
+  const startUrlStream = async () => {
+      if (!streamUrl.trim()) return;
+      setIsStreaming(true);
+      try {
+          const response = await fetch(streamUrl);
+          if (!response.body) throw new Error("No response body");
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let isFirstChunk = true;
+          
+          while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                  if (buffer.trim()) onDataLoaded(buffer, !isFirstChunk);
+                  stopStreaming();
+                  break;
+              }
+              const chunk = decoder.decode(value, { stream: true });
+              buffer += chunk;
+              
+              const lastNewlineIndex = buffer.lastIndexOf('\n');
+              if (lastNewlineIndex !== -1) {
+                  const completeLines = buffer.substring(0, lastNewlineIndex);
+                  buffer = buffer.substring(lastNewlineIndex + 1);
+                  if (completeLines.trim()) {
+                      onDataLoaded(completeLines, !isFirstChunk);
+                      isFirstChunk = false;
+                  }
+              }
+          }
+      } catch (err) {
+          console.error("Streaming error", err);
+          alert("Failed to stream from URL. Ensure CORS is enabled and URL is reachable.");
+          stopStreaming();
+      }
+  };
+
+  const startLocalFileTail = async () => {
+      try {
+          // @ts-ignore - File System Access API
+          const [fileHandle] = await window.showOpenFilePicker({
+              types: [
+                  {
+                      description: 'Log Files',
+                      accept: {
+                          'text/plain': ['.log', '.txt', '.json', '.csv']
+                      }
+                  }
+              ]
+          });
+          
+          setIsStreaming(true);
+          let file = await fileHandle.getFile();
+          
+          let lastSize = file.size;
+          let buffer = '';
+          let isFirstChunk = true;
+          
+          // Initial read: load the last 5MB if file is huge
+          const MAX_INITIAL_LOAD = 5 * 1024 * 1024;
+          const startSlice = Math.max(0, lastSize - MAX_INITIAL_LOAD);
+          const initialBlob = file.slice(startSlice, lastSize);
+          let initialContent = await initialBlob.text();
+          
+          buffer = initialContent;
+          const lastNewlineIndex = buffer.lastIndexOf('\n');
+          if (lastNewlineIndex !== -1) {
+              const completeLines = buffer.substring(0, lastNewlineIndex);
+              buffer = buffer.substring(lastNewlineIndex + 1);
+              
+              // Skip the first line if we started mid-file (meaning startSlice > 0)
+              const firstNewlineIndex = completeLines.indexOf('\n');
+              const finalLines = (startSlice > 0 && firstNewlineIndex !== -1) 
+                  ? completeLines.substring(firstNewlineIndex + 1) 
+                  : completeLines;
+                  
+              if (finalLines.trim()) {
+                  onDataLoaded(finalLines, !isFirstChunk);
+                  isFirstChunk = false;
+              }
+          }
+
+          // Poll for changes
+          pollingRef.current = window.setInterval(async () => {
+              try {
+                  const currentFile = await fileHandle.getFile();
+                  if (currentFile.size > lastSize) {
+                      const newSlice = currentFile.slice(lastSize);
+                      const text = await newSlice.text();
+                      buffer += text;
+                      const lastNewline = buffer.lastIndexOf('\n');
+                      if (lastNewline !== -1) {
+                          const completeLines = buffer.substring(0, lastNewline);
+                          buffer = buffer.substring(lastNewline + 1);
+                          if (completeLines.trim()) {
+                              onDataLoaded(completeLines, !isFirstChunk);
+                              isFirstChunk = false;
+                          }
+                      }
+                      lastSize = currentFile.size;
+                  } else if (currentFile.size < lastSize) {
+                      // File got truncated/rotated
+                      lastSize = 0;
+                      buffer = '';
+                  }
+              } catch (e) {
+                  console.error("Error tailing file", e);
+                  stopStreaming();
+              }
+          }, 1000);
+
+      } catch (err) {
+          console.error("File selection error", err);
+          stopStreaming();
+      }
+  };
 
   const processFile = async (file: File) => {
     setIsProcessing(true);
     try {
-        let content = '';
         if (file.name.endsWith('.gz')) {
             const buffer = await file.arrayBuffer();
             const decompressed = gunzipSync(new Uint8Array(buffer));
-            content = new TextDecoder().decode(decompressed);
+            const content = new TextDecoder().decode(decompressed);
+            onDataLoaded(content);
         } else if (file.name.endsWith('.zip')) {
             const buffer = await file.arrayBuffer();
             const unzipped = unzipSync(new Uint8Array(buffer));
+            let content = '';
             for (const path in unzipped) {
                  if (!path.endsWith('/') && !path.includes('__MACOSX')) {
                      content += new TextDecoder().decode(unzipped[path]) + '\n';
                  }
             }
+            onDataLoaded(content);
         } else {
-            content = await file.text();
+            // Read large text files in chunks to avoid blocking the main thread
+            const stream = file.stream();
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let isFirstChunk = true;
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    if (buffer.trim()) onDataLoaded(buffer, !isFirstChunk);
+                    break;
+                }
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+                const lastNewlineIndex = buffer.lastIndexOf('\n');
+                if (lastNewlineIndex !== -1) {
+                    const completeLines = buffer.substring(0, lastNewlineIndex);
+                    buffer = buffer.substring(lastNewlineIndex + 1);
+                    if (completeLines.trim()) {
+                        onDataLoaded(completeLines, !isFirstChunk);
+                        isFirstChunk = false;
+                    }
+                }
+                // Yield to UI thread to keep the "Processing Logs..." spinner spinning
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
         }
-        onDataLoaded(content);
     } catch (e) {
         console.error("File processing error", e);
         alert('Failed to process file. Ensure it is a valid text, zip, or gz file.');
@@ -190,6 +348,16 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
                 >
                     <Clipboard size={16} /> Paste Text
                 </button>
+                <button 
+                    onClick={() => setActiveTab('stream')}
+                    className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-all ${
+                        activeTab === 'stream' 
+                        ? 'bg-emerald-600 text-white shadow-lg' 
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-300 dark:hover:bg-slate-700/50'
+                    }`}
+                >
+                    <Activity size={16} /> Stream
+                </button>
             </div>
         </div>
 
@@ -259,6 +427,71 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
                             className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-blue-500/20"
                         >
                             Analyze Text
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Stream Tab */}
+            {activeTab === 'stream' && (
+                <div className="space-y-6">
+                    <div className="space-y-4">
+                        <div className="flex flex-col gap-2">
+                             <h3 className="text-lg font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                                <Globe className="text-emerald-500" size={20} /> Stream from URL
+                             </h3>
+                             <p className="text-sm text-slate-600 dark:text-slate-400">
+                                 Stream logs from any HTTP endpoint. Supports chunked transfer encoding and SSE.
+                             </p>
+                        </div>
+                        <div className="flex gap-4">
+                            <input 
+                                className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm font-mono text-slate-800 dark:text-slate-300 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 placeholder:text-slate-400 dark:placeholder:text-slate-600 disabled:opacity-50"
+                                placeholder="http://localhost:8080/stream"
+                                value={streamUrl}
+                                onChange={(e) => setStreamUrl(e.target.value)}
+                                disabled={isStreaming}
+                            />
+                            {isStreaming ? (
+                                <button 
+                                    onClick={stopStreaming}
+                                    className="bg-red-500 hover:bg-red-400 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-red-500/20 whitespace-nowrap flex items-center gap-2"
+                                >
+                                    <Loader2 size={16} className="animate-spin" /> Stop
+                                </button>
+                            ) : (
+                                <button 
+                                    disabled={!streamUrl.trim()}
+                                    onClick={startUrlStream}
+                                    className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-emerald-500/20 whitespace-nowrap"
+                                >
+                                    Start Stream
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-widest divider">
+                        <span className="h-px bg-slate-300 dark:bg-slate-800 flex-1"></span>
+                        <span>OR</span>
+                        <span className="h-px bg-slate-300 dark:bg-slate-800 flex-1"></span>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex flex-col gap-2">
+                             <h3 className="text-lg font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                                <Terminal className="text-blue-500" size={20} /> Tail Local File
+                             </h3>
+                             <p className="text-sm text-slate-600 dark:text-slate-400">
+                                 Select a local log file, and we will continuously poll it for new lines. Useful for command output piped to a file `command &gt; output.log`.
+                             </p>
+                        </div>
+                        <button 
+                            onClick={startLocalFileTail}
+                            disabled={isStreaming}
+                            className="w-full bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 border border-blue-200 dark:border-blue-500/30 text-blue-700 dark:text-blue-400 px-6 py-4 rounded-lg font-medium transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                        >
+                            <FileText size={20} /> Select File to Tail
                         </button>
                     </div>
                 </div>

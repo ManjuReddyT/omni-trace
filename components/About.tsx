@@ -29,11 +29,11 @@ const About: React.FC = () => {
                     </p>
                     <div className="mt-3 bg-slate-100 dark:bg-slate-900 p-4 rounded-lg font-mono text-sm overflow-x-auto text-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                         <p className="opacity-50 mb-2"># Kubernetes</p>
-                        <p>kubectl logs -l app=my-app > logs.txt</p>
+                        <p>kubectl logs -l app=my-app &gt; logs.txt</p>
                         <p className="opacity-50 mt-3 mb-2"># Docker</p>
-                        <p>docker logs my-container > logs.txt</p>
+                        <p>docker logs my-container &gt; logs.txt</p>
                         <p className="opacity-50 mt-3 mb-2"># GCP</p>
-                        <p>gcloud logging read "resource.type=k8s_container" --limit=1000 --format=json > logs.json</p>
+                        <p>gcloud logging read "resource.type=k8s_container" --limit=1000 --format=json &gt; logs.json</p>
                     </div>
                 </div>
             </div>
@@ -79,14 +79,29 @@ const About: React.FC = () => {
                     example: '2023-10-10 13:55:36 UTC [123] LOG: duration: 50.0 ms ...'
                 },
                 { 
-                    title: 'Envoy Access Logs', 
-                    desc: 'Default Envoy Proxy access log format.',
-                    example: '[2023-10-10T13:55:36Z] "GET /path HTTP/1.1" 200 ...'
+                    title: 'MongoDB', 
+                    desc: 'MongoDB structured JSON logs (v4.4+) containing timestamp, severity, component, and message context.',
+                    example: '{"t":{"$date":"2023-10-10T13:55:36.123+00:00"},"s":"I", "c":"NETWORK", "msg":"Connection accepted"}'
                 },
                  { 
                     title: 'Redis', 
-                    desc: 'Redis server logs.',
-                    example: '1:M 10 Oct 2023 13:55:36.123 * DB saved on disk'
+                    desc: 'Redis server logs detailing process ID, role (Master/Slave), timestamp, and operational events.',
+                    example: '27262:M 10 Oct 2023 13:55:36.123 * Ready to accept connections'
+                },
+                {
+                    title: 'Spring Boot',
+                    desc: 'Default Spring Boot format featuring timestamp, log level, process ID, thread name, and Logger class.',
+                    example: '2023-10-10 13:55:36.123  INFO 12345 --- [main] o.s.b.w.e.tomcat.TomcatWebServer : Tomcat started...'
+                },
+                { 
+                    title: 'Envoy Access Logs', 
+                    desc: 'Envoy Proxy access logs including request, response code, latency, and upstream host details.',
+                    example: '[2023-10-10T13:55:36.123Z] "GET /api HTTP/1.1" 200 - 0 120 50 15 "10.0.0.1" "curl/7.68.0" ...'
+                },
+                {
+                    title: 'Amazon CloudFront',
+                    desc: 'W3C extended format from CloudFront containing edge location, distribution domain, and request/response metrics.',
+                    example: '2023-10-10 13:55:36 IAD89-C1 192.168.0.1 GET d111111abcdef8.cloudfront.net /logo.png 200 ...'
                 }
             ].map(fmt => (
                 <div key={fmt.title} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">

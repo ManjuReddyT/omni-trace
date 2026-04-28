@@ -133,8 +133,8 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                     <button 
                         onClick={onReset}
                         className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-500 dark:text-slate-400"
-                        title="Upload new file"
-                        aria-label="Reset and upload new file"
+                        title="Go back to file upload screen"
+                        aria-label="Go back to file upload screen"
                     >
                         <ArrowLeft size={20} />
                     </button>
@@ -161,7 +161,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as Tab)}
-                                aria-label={`Switch to ${tab.label} view`}
+                                aria-label={`Switch to ${tab.label} dashboard view`}
                                 className={`
                                     flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all
                                     ${activeTab === tab.id 
@@ -177,7 +177,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
 
                     <button 
                         onClick={() => setShowFilters(!showFilters)}
-                        aria-label={showFilters ? "Hide filters" : "Show filters"}
+                        aria-label={showFilters ? "Hide log filters panel" : "Show log filters panel"}
                         className={`
                             flex items-center gap-2 px-3 py-2 rounded-lg border transition-all text-sm font-medium
                             ${showFilters || activeFilterCount > 0
@@ -208,7 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                     <button
                                         key={range}
                                         onClick={() => setTimeRange(range as TimeRange)}
-                                        aria-label={`Filter by time range: ${range}`}
+                                        aria-label={`Filter logs by time range: ${range}`}
                                         className={`px-3 py-1 text-xs rounded-md transition-all ${
                                             timeRange === range 
                                             ? 'bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm font-medium' 
@@ -231,7 +231,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                     value={filterText}
                                     onChange={(e) => setFilterText(e.target.value)}
                                     placeholder="Method or Path..."
-                                    aria-label="Search logs by method or path"
+                                    aria-label="Search logs by HTTP method or endpoint path"
                                     className="bg-transparent border-none outline-none text-xs text-slate-800 dark:text-slate-200 w-32 md:w-48 placeholder:text-slate-400 dark:placeholder:text-slate-600"
                                 />
                             </div>
@@ -253,7 +253,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                         <button
                                             key={cls}
                                             onClick={() => toggleStatusClass(cls)}
-                                            aria-label={`Toggle status class ${cls}`}
+                                            aria-label={`Toggle HTTP ${cls} status class filter`}
                                             className={`
                                                 px-3 py-1.5 rounded-lg text-xs font-mono border transition-all
                                                 ${isActive 
@@ -277,8 +277,8 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                     value={minLatency}
                                     onChange={(e) => setMinLatency(e.target.value)}
                                     placeholder="Min"
-                                    aria-label="Minimum latency"
-                                    title="Filters logs with latency greater than or equal to this value (ms)"
+                                    aria-label="Minimum latency filter in milliseconds"
+                                    title="Filters logs with latency greater than or equal to this value in milliseconds"
                                     className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-sm w-20 focus:ring-1 focus:ring-blue-500 outline-none placeholder:text-slate-400 text-slate-800 dark:text-slate-200"
                                 />
                                 <span className="text-slate-400 dark:text-slate-600">-</span>
@@ -287,8 +287,8 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                     value={maxLatency}
                                     onChange={(e) => setMaxLatency(e.target.value)}
                                     placeholder="Max"
-                                    aria-label="Maximum latency"
-                                    title="Filters logs with latency less than or equal to this value (ms)"
+                                    aria-label="Maximum latency filter in milliseconds"
+                                    title="Filters logs with latency less than or equal to this value in milliseconds"
                                     className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-sm w-20 focus:ring-1 focus:ring-blue-500 outline-none placeholder:text-slate-400 text-slate-800 dark:text-slate-200"
                                 />
                              </div>
@@ -299,7 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                             <div className="pt-5">
                                 <button 
                                     onClick={clearFilters}
-                                    aria-label="Clear all filters"
+                                    aria-label="Clear all active log filters"
                                     className="text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 flex items-center gap-1"
                                 >
                                     <X size={12} /> Clear All
@@ -447,7 +447,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                         Statistical Anomalies
                     </h3>
                     <p className="text-slate-600 dark:text-slate-400 text-sm mb-6">
-                        We detected {stats.anomalies.length} logs that deviate significantly from normal latency patterns (Z-Score > 3) or represent critical failures.
+                        We detected {stats.anomalies.length} logs that deviate significantly from normal latency patterns (Z-Score &gt; 3) or represent critical failures.
                     </p>
                     <div className="space-y-2">
                         {stats.anomalies.length === 0 ? (

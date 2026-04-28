@@ -10,6 +10,7 @@ LogPulse Analytics is a modern, high-performance dashboard designed to visualize
   - **Google Gemini**: Cloud-based analysis.
   - **Ollama**: **NEW!** Local LLM support for privacy-conscious users.
 - **Theming**: **NEW!** Dark and Light mode support.
+- **About Page**: **NEW!** Detailed descriptions and sample log snippets for MongoDB, Redis, Spring Boot, Envoy, and CloudFront log formats.
 - **Visualizations**: Traffic Volume, Latency Heatmaps, Status Code Distribution, Pattern Clustering.
 
 ## 📋 Usage
@@ -20,14 +21,20 @@ LogPulse Analytics is a modern, high-performance dashboard designed to visualize
 
 ## 🐳 Docker Deployment
 
-You can run LogPulse locally using Docker:
+You can quickly deploy and run LogPulse locally using Docker. Our lightweight, multi-stage build makes this easy:
 
-```bash
-docker build -t logpulse .
-docker run -p 8080:80 logpulse
-```
+1. **Build the Docker image:**
+   ```bash
+   docker build -t logpulse-analytics .
+   ```
 
-Open `http://localhost:8080` in your browser.
+2. **Run the Docker container:**
+   ```bash
+   docker run -d -p 8080:80 --name logpulse logpulse-analytics
+   ```
+
+3. **Access the app:**
+   Open `http://localhost:8080` in your browser.
 
 ## 🤖 Ollama Setup
 

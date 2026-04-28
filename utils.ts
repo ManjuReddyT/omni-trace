@@ -776,17 +776,14 @@ export const aggregateStats = (logs: ProcessedLogEntry[]): AggregatedStats => {
   const variance = latencies.reduce((sum, val) => sum + Math.pow(val - meanLat, 2), 0) / totalRequests;
   const stdDev = Math.sqrt(variance);
   
-  const anomalies = logs.filter(l => {
+  const anomalies = logs.map(l => {
       const zScore = (l.latency - meanLat) / (stdDev || 1);
+      return { ...l, anomalyScore: zScore };
+  }).filter(l => {
       // Flag if latency is 3+ sigma OR if it's a 5xx error
-      const isOutlier = zScore > 3 && l.latency > 100; // Require minimal latency to avoid flagging fast requests
+      const isOutlier = l.anomalyScore! > 3 && l.latency > 100; // Require minimal latency to avoid flagging fast requests
       const isCritical = l.status >= 500;
-      
-      if (isOutlier || isCritical) {
-          l.anomalyScore = zScore;
-          return true;
-      }
-      return false;
+      return isOutlier || isCritical;
   }).sort((a,b) => b.latency - a.latency).slice(0, 50);
 
   // --- Clustering ---

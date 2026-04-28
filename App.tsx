@@ -29,9 +29,15 @@ function App() {
     localStorage.setItem('logpulse_settings', JSON.stringify(settings));
   }, [settings]);
 
-  const handleDataLoaded = useCallback((content: string) => {
+  const handleDataLoaded = useCallback((content: string, isAppend: boolean = false) => {
     const parsedLogs = parseLogs(content);
-    setLogs(parsedLogs);
+    setLogs(prev => {
+        if (isAppend && prev) {
+            const newLogs = [...prev, ...parsedLogs];
+            return newLogs.length > 10000 ? newLogs.slice(-10000) : newLogs;
+        }
+        return parsedLogs.length > 10000 ? parsedLogs.slice(-10000) : parsedLogs;
+    });
   }, []);
 
   const handleReset = () => {

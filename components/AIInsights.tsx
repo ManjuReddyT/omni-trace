@@ -71,95 +71,136 @@ New context: ${stats.totalRequests} requests, ${stats.errorRate.toFixed(2)}% err
       return () => clearTimeout(timer);
   }, [stats]);
 
-  const generateWithGemini = async (prompt: string, context: string) => {
-    const key = settings.geminiKey || process.env.API_KEY;
-    if (!key) throw new Error("No Gemini API Key found in settings or environment.");
-    
-    const ai = new GoogleGenAI({ apiKey: key });
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Context:\n${context}\n\nUser Question: ${prompt}\n\nAnswer as a SRE expert.`,
-    });
-    return response.text || "No text generated.";
-  };
-
-  const generateWithOllama = async (prompt: string, context: string) => {
-      const payload = {
-          model: settings.ollamaModel,
-          prompt: `You are an SRE expert analyzing server logs.
-          
-          CONTEXT DATA:
-          ${context}
-          
-          USER QUESTION:
-          ${prompt}
-          
-          ANSWER (Markdown):`,
-          stream: false
-      };
-
-      try {
-          const res = await fetch(`${settings.ollamaUrl}/api/generate`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-          });
-          
-          if (!res.ok) throw new Error(`Ollama Error: ${res.status} ${res.statusText}`);
-          const data = await res.json();
-          return data.response;
-      } catch (e: any) {
-          throw new Error(`Failed to connect to Ollama at ${settings.ollamaUrl}. Ensure it's running with 'ollama serve' and CORS is allowed (OLLAMA_ORIGINS="*"). Details: ${e.message}`);
-      }
-  };
-
   const handleSend = async () => {
     if (!input.trim()) return;
     
     const userMsg = input;
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    const currentMessages = [...messages];
+    setMessages([...currentMessages, { role: 'user', content: userMsg }]);
     setInput('');
     setIsProcessing(true);
 
     try {
         let filterContextStr = '';
-        if (filters) {
+        if (filters && (filters.selectedMethods.length || filters.selectedStatusClasses.length || filters.filterText)) {
             const methods = filters.selectedMethods.length > 0 ? filters.selectedMethods.join(', ') : 'All';
             const statuses = filters.selectedStatusClasses.length > 0 ? filters.selectedStatusClasses.join(', ') : 'All';
             const latency = `${filters.minLatency || '0'}ms - ${filters.maxLatency || '∞'}ms`;
             
             filterContextStr = `
-        Active View Filters:
-        - Time Range: ${filters.timeRange}
-        - Search Query: "${filters.filterText || 'None'}"
-        - Methods: ${methods}
-        - Status Classes: ${statuses}
-        - Latency Range: ${latency}
-            `;
+Active View Filters: Time: ${filters.timeRange}, Query: "${filters.filterText || 'None'}", Methods: ${methods}, Status: ${statuses}, Latency: ${latency}`;
         }
 
-        const context = `
-        ${filterContextStr}
-        System Stats (Computed from Filtered View):
-        - Total Requests: ${stats.totalRequests}
-        - Error Rate: ${stats.errorRate.toFixed(2)}%
-        - Avg Latency: ${stats.avgLatency.toFixed(2)}ms
-        - P95 Latency: ${stats.p95Latency.toFixed(2)}ms
-        - Top Endpoints: ${stats.topEndpoints.slice(0, 5).map(e => `${e.path} (${e.errorRate.toFixed(1)}% errors)`).join(', ')}
-        - Significant Patterns: ${stats.clusters.slice(0, 3).map(c => c.template).join('\n')}
-        `;
+        const systemContext = `You are an SRE expert analyzing server logs.
+${filterContextStr}
+System Stats (Computed from Filtered View):
+- Total Requests: ${stats.totalRequests}
+- Error Rate: ${stats.errorRate.toFixed(2)}%
+- Avg Latency: ${stats.avgLatency.toFixed(2)}ms
+- P95 Latency: ${stats.p95Latency.toFixed(2)}ms
+- Top Endpoints: ${stats.topEndpoints.slice(0, 5).map(e => `${e.path} (${e.errorRate.toFixed(1)}% errors)`).join(', ')}
+- Significant Patterns: ${stats.clusters.slice(0, 3).map(c => c.template).join('\n')}
 
-        let text = '';
+Always answer concisely and accurately.`;
+
+        // Add an empty assistant message to stream into
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
         if (settings.aiProvider === 'ollama') {
-            text = await generateWithOllama(userMsg, context);
-        } else {
-            text = await generateWithGemini(userMsg, context);
-        }
+            const payload = {
+                model: settings.ollamaModel,
+                messages: [
+                    { role: 'system', content: systemContext },
+                    ...currentMessages.map(m => ({ role: m.role, content: m.content })),
+                    { role: 'user', content: userMsg }
+                ],
+                stream: true
+            };
 
-        setMessages(prev => [...prev, { role: 'assistant', content: text }]);
+            const baseUrl = settings.ollamaUrl.replace(/\/+$/, '');
+            const res = await fetch(`${baseUrl}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!res.ok) throw new Error(`Ollama Error: ${res.status} ${res.statusText}`);
+            if (!res.body) throw new Error('No response body from Ollama');
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedText = '';
+
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunkStr = decoder.decode(value, { stream: true });
+                    const lines = chunkStr.split('\n');
+                    
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line);
+                            if (data.message?.content) {
+                                accumulatedText += data.message.content;
+                                setMessages(prev => {
+                                    const newMsgs = [...prev];
+                                    newMsgs[newMsgs.length - 1] = { role: 'assistant', content: accumulatedText };
+                                    return newMsgs;
+                                });
+                            }
+                        } catch (e) {
+                            console.error("Error parsing Ollama stream chunk", e, line);
+                        }
+                    }
+                }
+            } finally {
+                reader.releaseLock();
+            }
+
+        } else {
+            // Gemini Streaming
+            const key = settings.geminiKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
+            if (!key) throw new Error("No Gemini API Key found in settings or environment.");
+            
+            const ai = new GoogleGenAI({ apiKey: key });
+            
+            const geminiMessages = [
+                { role: 'user', parts: [{ text: systemContext }] },
+                { role: 'model', parts: [{ text: "Understood. I have the context and am ready to answer queries as an SRE expert." }] },
+                ...currentMessages.filter(m => m.content.trim()).map(m => ({
+                    role: m.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: m.content }]
+                })),
+                { role: 'user', parts: [{ text: userMsg }] }
+            ];
+
+            const responseStream = await ai.models.generateContentStream({
+                model: 'gemini-2.5-flash',
+                contents: geminiMessages
+            });
+
+            let accumulatedText = '';
+            for await (const chunk of responseStream) {
+                if (chunk.text) {
+                    accumulatedText += chunk.text;
+                    setMessages(prev => {
+                        const newMsgs = [...prev];
+                        newMsgs[newMsgs.length - 1] = { role: 'assistant', content: accumulatedText };
+                        return newMsgs;
+                    });
+                }
+            }
+        }
     } catch (e: any) {
         console.error("AI Error", e);
-        setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${e.message}` }]);
+        setMessages(prev => {
+            const newMsgs = [...prev];
+            newMsgs[newMsgs.length - 1] = { role: 'assistant', content: `Error: ${e.message}` };
+            return newMsgs;
+        });
     } finally {
         setIsProcessing(false);
     }

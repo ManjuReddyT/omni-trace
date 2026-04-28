@@ -82,7 +82,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'dark',
+  theme: 'light',
   aiProvider: 'gemini',
   geminiKey: '',
   ollamaUrl: 'http://localhost:11434',
