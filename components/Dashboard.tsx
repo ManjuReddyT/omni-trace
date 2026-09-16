@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ProcessedLogEntry, AppSettings } from '../types';
-import { aggregateStats } from '../utils';
+import { aggregateStats, queryLogs } from '../engine';
 import GoldenSignals from './GoldenSignals';
 import LogExplorer from './LogExplorer';
 import AIInsights from './AIInsights';
@@ -112,82 +112,22 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
     return Array.from(methods).sort();
   }, [logs]);
 
-  // Determine the latest timestamp in the logs to act as "now" for relative time filtering
-  const latestTimestamp = useMemo(() => {
-    if (logs.length === 0) return 0;
-    return logs.reduce((max, log) => {
-        const t = new Date(log.timestamp).getTime();
-        return t > max ? t : max;
-    }, 0);
-  }, [logs]);
+  const minLat = minLatency === '' ? 0 : parseFloat(minLatency);
+  const maxLat = maxLatency === '' ? Infinity : parseFloat(maxLatency);
 
-  // Filter logs logic
-  const filteredLogs = useMemo(() => {
-    const minLat = minLatency === '' ? 0 : parseFloat(minLatency);
-    const maxLat = maxLatency === '' ? Infinity : parseFloat(maxLatency);
-    
-    // Time range calculation
-    let timeCutoff = 0;
-    if (timeRange !== 'ALL' && latestTimestamp > 0) {
-        const msMap: Record<string, number> = {
-            '15M': 15 * 60 * 1000,
-            '1H': 60 * 60 * 1000,
-            '6H': 6 * 60 * 60 * 1000,
-            '24H': 24 * 60 * 60 * 1000,
-        };
-        timeCutoff = latestTimestamp - (msMap[timeRange] || 0);
-    }
-
-    return logs.filter(log => {
-      // 1. Text Search
-      const matchesText = (() => {
-        if (filterText === '') return true;
-        const ft = filterText.toLowerCase();
-        
-        let logKey = `${log.method} ${log.path}`.toLowerCase();
-        if (log.logType === 'DATABASE') logKey = `[db] ${logKey}`;
-        else if (log.logType === 'SYSTEM') logKey = `[sys] ${log.path.toLowerCase()}`;
-        else if (log.logType === 'APP') logKey = `[app] ${logKey}`;
-        
-        return logKey.includes(ft) || log.fullRequest.toLowerCase().includes(ft);
-      })();
-      
-      if (!matchesText) return false;
-
-      // 2. Log Type Filter
-      if (selectedLogTypes.length > 0 && !selectedLogTypes.includes(log.logType)) {
-          return false;
-      }
-
-      // 3. Method Filter
-      if (selectedMethods.length > 0 && !selectedMethods.includes(log.method)) {
-          return false;
-      }
-
-      // 4. Status Class Filter
-      if (selectedStatusClasses.length > 0) {
-          let statusClass = '';
-          if (log.logType === 'HTTP') {
-            statusClass = Math.floor(log.status / 100) + 'xx';
-          } else {
-            statusClass = log.isError ? 'Error' : 'Success';
-          }
-          if (!selectedStatusClasses.includes(statusClass)) return false;
-      }
-
-      // 5. Latency Filter
-      if (log.latency < minLat) return false;
-      if (log.latency > maxLat) return false;
-
-      // 6. Time Range
-      if (timeCutoff > 0) {
-          const logTime = new Date(log.timestamp).getTime();
-          if (logTime < timeCutoff) return false;
-      }
-
-      return true;
-    });
-  }, [logs, filterText, selectedMethods, selectedStatusClasses, selectedLogTypes, minLatency, maxLatency, timeRange, latestTimestamp]);
+  const filteredLogs = useMemo(
+    () =>
+      queryLogs(logs, {
+        text: filterText,
+        methods: selectedMethods,
+        statusClasses: selectedStatusClasses,
+        logTypes: selectedLogTypes,
+        minLatency: Number.isNaN(minLat) ? 0 : minLat,
+        maxLatency: Number.isNaN(maxLat) ? Infinity : maxLat,
+        timeRange,
+      }),
+    [logs, filterText, selectedMethods, selectedStatusClasses, selectedLogTypes, minLat, maxLat, timeRange]
+  );
 
   const stats = useMemo(() => aggregateStats(filteredLogs), [filteredLogs]);
 
@@ -229,7 +169,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
     (timeRange !== 'ALL' ? 1 : 0);
 
   return (
-    <div className="min-h-screen pb-20 font-sans transition-colors duration-300">
+    <div className="min-h-screen pb-20 font-sans transition-colors duration-300" data-testid="dashboard">
       {/* Navbar */}
       <nav className="border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -463,6 +403,24 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
         {/* GOLDEN SIGNALS - Always Visible at Top */}
         <GoldenSignals data={stats.goldenSignals} />
 
+        {filteredLogs.length === 0 && logs.length > 0 && (
+            <div
+                data-testid="empty-filtered"
+                className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-8 text-center"
+            >
+                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">No logs match these filters</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    {logs.length.toLocaleString()} lines are loaded in this browser — the current filters hide all of them.
+                </p>
+                <button
+                    onClick={clearFilters}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                >
+                    Clear filters
+                </button>
+            </div>
+        )}
+
         {/* Tab Content */}
         {activeTab === 'OVERVIEW' && (
             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
@@ -605,10 +563,15 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                         Log Pattern Clustering
                     </h3>
                     <p className="text-slate-600 dark:text-slate-400 text-sm mb-6">
-                        We've automatically grouped {filteredLogs.length} logs into {stats.clusters.length} unique patterns by removing dynamic variables (IDs, Timestamps, IPs).
+                        Drain clustered {filteredLogs.length} logs into {stats.clusters.length} templates (token-length + similarity, variables as {'<*>'}).
                     </p>
                     <div className="space-y-3">
-                        {stats.clusters.map(cluster => (
+                        {stats.clusters.length === 0 ? (
+                            <div data-testid="empty-patterns" className="p-8 text-center text-slate-500 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800 border-dashed">
+                                No patterns in the current view. Clear filters or load a file with repeating message shapes.
+                            </div>
+                        ) : (
+                        stats.clusters.map(cluster => (
                             <div key={cluster.id} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:border-slate-400 dark:hover:border-slate-500 transition-colors group">
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="font-mono text-xs text-slate-700 dark:text-slate-300 break-all pr-4">
@@ -633,7 +596,8 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                     Sample: {cluster.sample}
                                 </div>
                             </div>
-                        ))}
+                        ))
+                        )}
                     </div>
                 </div>
             </div>
@@ -647,12 +611,12 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                         Statistical Anomalies
                     </h3>
                     <p className="text-slate-600 dark:text-slate-400 text-sm mb-6">
-                        We detected {stats.anomalies.length} logs that deviate significantly from normal latency patterns (Z-Score &gt; 3) or represent critical failures.
+                        {stats.anomalies.length} events vs the per-endpoint latency baseline (z-score &gt; 3, min 3 samples) or 5xx.
                     </p>
                     <div className="space-y-2">
                         {stats.anomalies.length === 0 ? (
-                            <div className="p-8 text-center text-slate-500 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800 border-dashed">
-                                No significant anomalies detected in the current dataset.
+                            <div data-testid="empty-anomalies" className="p-8 text-center text-slate-500 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-800 border-dashed">
+                                No anomalies against per-endpoint baselines in this view. That is a result, not missing data.
                             </div>
                         ) : (
                             stats.anomalies.map(log => (

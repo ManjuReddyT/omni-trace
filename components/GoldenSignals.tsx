@@ -65,7 +65,7 @@ const SignalCard = ({
 
 const GoldenSignals: React.FC<Props> = ({ data }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="golden-signals">
       <SignalCard 
         label="Latency (P95)" 
         value={data.latency.toFixed(0)} 
@@ -96,7 +96,7 @@ const GoldenSignals: React.FC<Props> = ({ data }) => {
         unit="%" 
         icon={BatteryCharging} 
         color="purple"
-        detail="Estimated system capacity usage"
+        detail="Occupancy × errors × p95/p50 (not raw req/s)"
       />
     </div>
   );

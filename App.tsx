@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import SettingsModal from './components/SettingsModal';
 import About from './components/About';
 import { parseLogsInWorker } from './engine/client';
+import { clearSession, loadSession, saveSession } from './engine/store';
 import {
   ProcessedLogEntry,
   AppSettings,
@@ -18,7 +19,36 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   const [showSettings, setShowSettings] = useState(false);
   const [currentView, setCurrentView] = useState<'HOME' | 'ABOUT'>('HOME');
+  const [ready, setReady] = useState(false);
   const lineOffsetRef = useRef(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadSession()
+      .then((saved) => {
+        if (cancelled || !saved?.length) return;
+        setLogs(saved);
+        lineOffsetRef.current = saved.length;
+      })
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!logs) {
+      void clearSession();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void saveSession(logs);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [logs, ready]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -49,6 +79,7 @@ function App() {
   const handleReset = () => {
     setLogs(null);
     lineOffsetRef.current = 0;
+    void clearSession();
   };
 
   const TopBar = () => (
@@ -80,6 +111,10 @@ function App() {
 
       {currentView === 'ABOUT' ? (
         <About />
+      ) : !ready ? (
+        <div className="min-h-screen flex items-center justify-center text-slate-500" data-testid="boot">
+          Restoring session…
+        </div>
       ) : (
         <>
           {logs ? (

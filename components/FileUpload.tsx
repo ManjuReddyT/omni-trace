@@ -532,6 +532,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
                 ].map((sample) => (
                     <button
                         key={sample.name}
+                        data-testid={`sample-${sample.name}`}
                         onClick={() => loadSample(sample.name)}
                         className="group bg-white dark:bg-slate-800/40 hover:bg-slate-50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 rounded-xl p-4 text-left transition-all hover:-translate-y-1 hover:shadow-xl"
                     >
