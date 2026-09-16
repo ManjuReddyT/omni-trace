@@ -318,7 +318,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
         {/* Header */}
         <div className="text-center space-y-4">
             <h1 className="text-5xl md:text-7xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-cyan-400 dark:via-blue-500 dark:to-purple-600 pb-2">
-                LogPulse Analytics
+                OmniTrace
             </h1>
             <p className="text-slate-600 dark:text-slate-400 text-lg md:text-xl font-light max-w-2xl mx-auto">
                 The modern, privacy-first command center for SREs. Visualize latency, track errors, and cluster patterns instantly in your browser.

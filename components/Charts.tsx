@@ -119,7 +119,7 @@ export const TrafficChart: React.FC<ChartsProps> = ({ data, theme }) => {
   );
 };
 
-export const StatusDistribution: React.FC<ChartsProps> = ({ data, theme }) => {
+export const StatusDistribution: React.FC<ChartsProps & { onStatusClick?: (status: string) => void }> = ({ data, theme, onStatusClick }) => {
   return (
     <div className="w-full h-[250px]">
       <ResponsiveContainer width="100%" height="100%">
@@ -132,9 +132,15 @@ export const StatusDistribution: React.FC<ChartsProps> = ({ data, theme }) => {
             outerRadius={80}
             paddingAngle={5}
             dataKey="value"
+            onClick={(data) => {
+              if (onStatusClick && data && data.name) {
+                onStatusClick(data.name);
+              }
+            }}
+            className={onStatusClick ? "cursor-pointer outline-none hover:opacity-80 transition-opacity" : "outline-none"}
           >
             {data.statusDistribution.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(0,0,0,0)" />
+              <Cell key={`cell-${index}`} fill={entry.fill} stroke="rgba(0,0,0,0)" style={{ outline: 'none' }} />
             ))}
           </Pie>
           <Tooltip content={<CustomTooltip theme={theme} />} />
@@ -145,7 +151,7 @@ export const StatusDistribution: React.FC<ChartsProps> = ({ data, theme }) => {
   );
 };
 
-export const TopEndpointsChart: React.FC<ChartsProps> = ({ data, theme }) => {
+export const TopEndpointsChart: React.FC<ChartsProps & { onEndpointClick?: (path: string) => void }> = ({ data, theme, onEndpointClick }) => {
   const chartData = data.topEndpoints.slice(0, 5).map(e => ({
       ...e,
       shortPath: e.path.length > 30 ? '...' + e.path.slice(-30) : e.path
@@ -168,7 +174,19 @@ export const TopEndpointsChart: React.FC<ChartsProps> = ({ data, theme }) => {
           />
           <Tooltip content={<CustomTooltip theme={theme} />} cursor={{fill: theme === 'dark' ? '#1e293b' : '#f1f5f9'}} />
           <Legend />
-          <Bar dataKey="count" name="Volume" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
+          <Bar 
+            dataKey="count" 
+            name="Volume" 
+            fill="#8b5cf6" 
+            radius={[0, 4, 4, 0]} 
+            barSize={20}
+            onClick={(data) => {
+              if (onEndpointClick && data && data.path) {
+                onEndpointClick(data.path);
+              }
+            }}
+            className={onEndpointClick ? "cursor-pointer" : ""}
+          />
           <Bar dataKey="avgLatency" name="Latency (ms)" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
         </BarChart>
       </ResponsiveContainer>
@@ -176,7 +194,7 @@ export const TopEndpointsChart: React.FC<ChartsProps> = ({ data, theme }) => {
   );
 };
 
-export const LatencyHistogram: React.FC<ChartsProps> = ({ data, theme }) => {
+export const LatencyHistogram: React.FC<ChartsProps & { onBarClick?: (min: number, max: number) => void }> = ({ data, theme, onBarClick }) => {
   const gridColor = theme === 'dark' ? '#334155' : '#e2e8f0';
   const axisColor = theme === 'dark' ? '#94a3b8' : '#64748b';
 
@@ -188,7 +206,21 @@ export const LatencyHistogram: React.FC<ChartsProps> = ({ data, theme }) => {
           <XAxis dataKey="range" stroke={axisColor} tick={{fontSize: 10}} interval={2} />
           <YAxis stroke={axisColor} tick={{fontSize: 10}} />
           <Tooltip content={<CustomTooltip theme={theme} />} cursor={{fill: theme === 'dark' ? '#1e293b' : '#f1f5f9'}} />
-          <Bar dataKey="count" name="Request Count" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+          <Bar 
+            dataKey="count" 
+            name="Request Count" 
+            fill="#3b82f6" 
+            radius={[2, 2, 0, 0]}
+            onClick={(data) => {
+              if (onBarClick && data && data.range) {
+                const parts = data.range.replace('ms', '').split('-');
+                if (parts.length === 2) {
+                  onBarClick(parseFloat(parts[0]), parseFloat(parts[1]));
+                }
+              }
+            }}
+            className={onBarClick ? "cursor-pointer transition-opacity hover:opacity-80" : ""}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>

@@ -20,6 +20,7 @@ export interface ProcessedLogEntry {
   referer: string;
   isError: boolean;
   severity: LogSeverity;
+  logType: 'HTTP' | 'DATABASE' | 'SYSTEM' | 'APP' | 'UNKNOWN'; // Differentiate log formats
   bodyBytes: number;
   clusterId?: string; // For pattern grouping
   rawLine: string; // Original raw line for display

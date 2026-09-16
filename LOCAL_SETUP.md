@@ -15,10 +15,10 @@ We recommend using [Vite](https://vitejs.dev/) for a fast development experience
 
 ```bash
 # Create a new project using the React TypeScript template
-npm create vite@latest logpulse -- --template react-ts
+npm create vite@latest omnitrace -- --template react-ts
 
 # Navigate into the directory
-cd logpulse
+cd omnitrace
 
 # Install dependencies
 npm install
@@ -26,7 +26,7 @@ npm install
 
 ### 2. Install Required Libraries
 
-Install the specific libraries used in LogPulse:
+Install the specific libraries used in OmniTrace:
 
 ```bash
 npm install lucide-react recharts

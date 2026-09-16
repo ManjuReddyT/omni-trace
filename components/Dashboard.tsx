@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ProcessedLogEntry, AppSettings } from '../types';
 import { aggregateStats } from '../utils';
 import GoldenSignals from './GoldenSignals';
 import LogExplorer from './LogExplorer';
 import AIInsights from './AIInsights';
 import { TrafficChart, StatusDistribution, TopEndpointsChart, LatencyHistogram, HeatmapGrid } from './Charts';
-import { LayoutDashboard, FileText, Layers, Sparkles, Filter, ArrowLeft, Search, X, Activity, BarChart2, AlertTriangle, Zap } from 'lucide-react';
+import { LayoutDashboard, FileText, Layers, Sparkles, Filter, ArrowLeft, Search, X, Activity, BarChart2, AlertTriangle, Zap, Plus, Trash2, Maximize2, Minimize2, MoveRight, Settings, Share2, Check } from 'lucide-react';
+import { useUrlState } from '../hooks/useUrlState';
 
 interface DashboardProps {
   logs: ProcessedLogEntry[];
@@ -16,15 +17,67 @@ interface DashboardProps {
 type Tab = 'OVERVIEW' | 'EXPLORER' | 'PATTERNS' | 'ANOMALIES' | 'AI';
 type TimeRange = 'ALL' | '15M' | '1H' | '6H' | '24H';
 
+export type WidgetType = 'TRAFFIC' | 'STATUS' | 'LATENCY' | 'HEATMAP' | 'ENDPOINTS';
+export interface WidgetConfig {
+  id: string;
+  type: WidgetType;
+  width: 1 | 2 | 3;
+}
+
+const DEFAULT_WIDGETS: WidgetConfig[] = [
+  { id: '1', type: 'TRAFFIC', width: 2 },
+  { id: '2', type: 'STATUS', width: 1 },
+  { id: '3', type: 'HEATMAP', width: 3 },
+  { id: '4', type: 'LATENCY', width: 1 },
+  { id: '5', type: 'ENDPOINTS', width: 2 },
+];
+
+const WIDGET_OPTIONS = [
+  { type: 'TRAFFIC', label: 'Traffic & Errors', icon: Activity },
+  { type: 'STATUS', label: 'Status Distribution', icon: Activity },
+  { type: 'LATENCY', label: 'Latency Histogram', icon: BarChart2 },
+  { type: 'HEATMAP', label: 'Hourly Intensity Heatmap', icon: Zap },
+  { type: 'ENDPOINTS', label: 'Slowest Endpoints', icon: Activity },
+];
+
 const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('OVERVIEW');
-  const [filterText, setFilterText] = useState('');
-  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
-  const [selectedStatusClasses, setSelectedStatusClasses] = useState<string[]>([]);
-  const [minLatency, setMinLatency] = useState<string>('');
-  const [maxLatency, setMaxLatency] = useState<string>('');
-  const [timeRange, setTimeRange] = useState<TimeRange>('ALL');
+  const [activeTab, setActiveTab] = useUrlState<Tab>('tab', 'OVERVIEW');
+  const [filterText, setFilterText] = useUrlState('search', '');
+  const [selectedMethods, setSelectedMethods] = useUrlState<string[]>('methods', []);
+  const [selectedStatusClasses, setSelectedStatusClasses] = useUrlState<string[]>('status', []);
+  const [selectedLogTypes, setSelectedLogTypes] = useUrlState<string[]>('logTypes', []);
+  const [minLatency, setMinLatency] = useUrlState<string>('minLat', '');
+  const [maxLatency, setMaxLatency] = useUrlState<string>('maxLat', '');
+  const [timeRange, setTimeRange] = useUrlState<TimeRange>('time', 'ALL');
   const [showFilters, setShowFilters] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
+    const saved = localStorage.getItem('omnitrace_widgets');
+    return saved ? JSON.parse(saved) : DEFAULT_WIDGETS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('omnitrace_widgets', JSON.stringify(widgets));
+  }, [widgets]);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const addWidget = (type: WidgetType) => {
+    setWidgets(prev => [...prev, { id: Date.now().toString(), type, width: 1 }]);
+  };
+
+  const removeWidget = (id: string) => {
+    setWidgets(prev => prev.filter(w => w.id !== id));
+  };
+
+  const resizeWidget = (id: string, width: 1 | 2 | 3) => {
+    setWidgets(prev => prev.map(w => w.id === id ? { ...w, width } : w));
+  };
 
   // Derive unique methods from logs for the filter options
   const availableMethods = useMemo(() => {
@@ -60,29 +113,46 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
 
     return logs.filter(log => {
       // 1. Text Search
-      const matchesText = 
-        filterText === '' ||
-        log.path.toLowerCase().includes(filterText.toLowerCase()) || 
-        log.method.toLowerCase().includes(filterText.toLowerCase());
+      const matchesText = (() => {
+        if (filterText === '') return true;
+        const ft = filterText.toLowerCase();
+        
+        let logKey = `${log.method} ${log.path}`.toLowerCase();
+        if (log.logType === 'DATABASE') logKey = `[db] ${logKey}`;
+        else if (log.logType === 'SYSTEM') logKey = `[sys] ${log.path.toLowerCase()}`;
+        else if (log.logType === 'APP') logKey = `[app] ${logKey}`;
+        
+        return logKey.includes(ft) || log.fullRequest.toLowerCase().includes(ft);
+      })();
       
       if (!matchesText) return false;
 
-      // 2. Method Filter
+      // 2. Log Type Filter
+      if (selectedLogTypes.length > 0 && !selectedLogTypes.includes(log.logType)) {
+          return false;
+      }
+
+      // 3. Method Filter
       if (selectedMethods.length > 0 && !selectedMethods.includes(log.method)) {
           return false;
       }
 
-      // 3. Status Class Filter
+      // 4. Status Class Filter
       if (selectedStatusClasses.length > 0) {
-          const statusClass = Math.floor(log.status / 100) + 'xx';
+          let statusClass = '';
+          if (log.logType === 'HTTP') {
+            statusClass = Math.floor(log.status / 100) + 'xx';
+          } else {
+            statusClass = log.isError ? 'Error' : 'Success';
+          }
           if (!selectedStatusClasses.includes(statusClass)) return false;
       }
 
-      // 4. Latency Filter
+      // 5. Latency Filter
       if (log.latency < minLat) return false;
       if (log.latency > maxLat) return false;
 
-      // 5. Time Range
+      // 6. Time Range
       if (timeCutoff > 0) {
           const logTime = new Date(log.timestamp).getTime();
           if (logTime < timeCutoff) return false;
@@ -90,7 +160,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
 
       return true;
     });
-  }, [logs, filterText, selectedMethods, selectedStatusClasses, minLatency, maxLatency, timeRange, latestTimestamp]);
+  }, [logs, filterText, selectedMethods, selectedStatusClasses, selectedLogTypes, minLatency, maxLatency, timeRange, latestTimestamp]);
 
   const stats = useMemo(() => aggregateStats(filteredLogs), [filteredLogs]);
 
@@ -106,8 +176,15 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
     );
   };
 
+  const toggleLogType = (type: string) => {
+    setSelectedLogTypes(prev => 
+      prev.includes(type) ? prev.filter(x => x !== type) : [...prev, type]
+    );
+  };
+
   const clearFilters = () => {
       setFilterText('');
+      setSelectedLogTypes([]);
       setSelectedMethods([]);
       setSelectedStatusClasses([]);
       setMinLatency('');
@@ -117,6 +194,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
 
   const activeFilterCount = 
     (filterText ? 1 : 0) + 
+    selectedLogTypes.length +
     selectedMethods.length + 
     selectedStatusClasses.length + 
     (minLatency ? 1 : 0) + 
@@ -140,7 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                     </button>
                     <div className="flex flex-col">
                         <span className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-emerald-600 dark:from-blue-400 dark:to-emerald-400">
-                        LogPulse
+                        OmniTrace
                         </span>
                         <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
                             SRE Command Center
@@ -174,6 +252,16 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                             </button>
                         ))}
                     </div>
+
+                    <button 
+                        onClick={handleCopyLink}
+                        aria-label="Copy shareable link"
+                        title="Copy link to this view"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-sm font-medium mr-3"
+                    >
+                        {copiedLink ? <Check size={16} className="text-emerald-500" /> : <Share2 size={16} />}
+                        <span className="hidden sm:inline">{copiedLink ? 'Copied!' : 'Share'}</span>
+                    </button>
 
                     <button 
                         onClick={() => setShowFilters(!showFilters)}
@@ -221,6 +309,37 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                             </div>
                         </div>
                         
+                         {/* Log Type Filter */}
+                         <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Log Type</label>
+                            <div className="flex items-center gap-2">
+                                {['HTTP', 'DATABASE', 'SYSTEM', 'APP', 'UNKNOWN'].map((type) => {
+                                    const isActive = selectedLogTypes.includes(type);
+                                    let color = 'slate';
+                                    if (type === 'HTTP') color = 'blue';
+                                    if (type === 'DATABASE') color = 'indigo';
+                                    if (type === 'SYSTEM') color = 'purple';
+                                    if (type === 'APP') color = 'emerald';
+
+                                    return (
+                                        <button
+                                            key={type}
+                                            onClick={() => toggleLogType(type)}
+                                            aria-label={`Toggle ${type} log type filter`}
+                                            className={`
+                                                px-3 py-1.5 rounded-lg text-xs font-bold border transition-all
+                                                ${isActive 
+                                                    ? `bg-${color}-100 dark:bg-${color}-500/20 border-${color}-400 dark:border-${color}-500 text-${color}-700 dark:text-${color}-400` 
+                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500'}
+                                            `}
+                                        >
+                                            {type}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                         </div>
+                         
                          {/* Search Filter */}
                          <div className="space-y-1">
                             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Search</label>
@@ -230,8 +349,8 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                     type="text"
                                     value={filterText}
                                     onChange={(e) => setFilterText(e.target.value)}
-                                    placeholder="Method or Path..."
-                                    aria-label="Search logs by HTTP method or endpoint path"
+                                    placeholder="Search logs..."
+                                    aria-label="Search logs by content or path"
                                     className="bg-transparent border-none outline-none text-xs text-slate-800 dark:text-slate-200 w-32 md:w-48 placeholder:text-slate-400 dark:placeholder:text-slate-600"
                                 />
                             </div>
@@ -241,19 +360,19 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                          <div className="space-y-1">
                             <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status Class</label>
                             <div className="flex items-center gap-2">
-                                {['2xx', '3xx', '4xx', '5xx'].map((cls) => {
+                                {['2xx', '3xx', '4xx', '5xx', 'Success', 'Error'].map((cls) => {
                                     const isActive = selectedStatusClasses.includes(cls);
                                     let color = 'slate';
-                                    if (cls === '2xx') color = 'emerald';
+                                    if (cls === '2xx' || cls === 'Success') color = 'emerald';
                                     if (cls === '3xx') color = 'blue';
                                     if (cls === '4xx') color = 'amber';
-                                    if (cls === '5xx') color = 'red';
+                                    if (cls === '5xx' || cls === 'Error') color = 'red';
 
                                     return (
                                         <button
                                             key={cls}
                                             onClick={() => toggleStatusClass(cls)}
-                                            aria-label={`Toggle HTTP ${cls} status class filter`}
+                                            aria-label={`Toggle ${cls} status category filter`}
                                             className={`
                                                 px-3 py-1.5 rounded-lg text-xs font-mono border transition-all
                                                 ${isActive 
@@ -320,73 +439,127 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
         {/* Tab Content */}
         {activeTab === 'OVERVIEW' && (
             <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                {/* Row 1: Traffic, Status, Histogram */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-6 backdrop-blur-sm shadow-sm dark:shadow-xl">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                <Activity className="w-5 h-5 text-blue-500 dark:text-blue-400" />
-                                Traffic & Errors
-                            </h3>
-                        </div>
-                        <TrafficChart data={stats} theme={settings.theme} />
-                    </div>
-
-                    <div className="space-y-6">
-                         <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-6 backdrop-blur-sm shadow-sm dark:shadow-xl h-[50%]">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Status</h3>
-                            </div>
-                            <StatusDistribution data={stats} theme={settings.theme} />
-                             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                    <span>2xx</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                    <span>3xx</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                    <span>4xx</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                                    <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                                    <span>5xx</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-6 backdrop-blur-sm shadow-sm dark:shadow-xl h-[46%]">
-                             <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                     <BarChart2 size={16} className="text-blue-500 dark:text-blue-400" /> Latency
-                                </h3>
-                            </div>
-                            <LatencyHistogram data={stats} theme={settings.theme} />
-                        </div>
-                    </div>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Dashboard Overview</h2>
+                    <button 
+                        onClick={() => setEditMode(!editMode)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                            editMode 
+                            ? 'bg-blue-600 text-white shadow-sm' 
+                            : 'bg-white dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
+                        }`}
+                    >
+                        <Settings size={16} />
+                        {editMode ? 'Done Customizing' : 'Customize'}
+                    </button>
                 </div>
 
-                {/* Row 2: Heatmap & Slowest Endpoints */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-6 backdrop-blur-sm shadow-sm dark:shadow-xl flex flex-col">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                                <Zap className="w-5 h-5 text-yellow-500 dark:text-yellow-400" />
-                                Hourly Intensity
-                            </h3>
-                        </div>
-                        <HeatmapGrid data={stats} theme={settings.theme} />
+                {editMode && (
+                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-wrap gap-2 items-center">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300 mr-2">Add Widget:</span>
+                        {WIDGET_OPTIONS.map(opt => (
+                            <button
+                                key={opt.type}
+                                onClick={() => addWidget(opt.type as WidgetType)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-xs font-medium text-slate-600 dark:text-slate-300 hover:border-blue-500 hover:text-blue-600 transition-colors"
+                            >
+                                <Plus size={14} />
+                                {opt.label}
+                            </button>
+                        ))}
                     </div>
+                )}
 
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-6 backdrop-blur-sm shadow-sm dark:shadow-xl">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Slowest Endpoints</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {widgets.map(widget => (
+                        <div 
+                            key={widget.id} 
+                            className={`bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-6 backdrop-blur-sm shadow-sm dark:shadow-xl flex flex-col pt-14 relative min-h-[350px] ${
+                                widget.width === 3 ? 'md:col-span-2 lg:col-span-3' :
+                                widget.width === 2 ? 'md:col-span-2 lg:col-span-2' : ''
+                            }`}
+                        >
+                            {editMode && (
+                                <div className="absolute top-2 right-2 flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-md border border-slate-200 dark:border-slate-700 z-10 backdrop-blur-sm">
+                                    <button onClick={() => resizeWidget(widget.id, 1)} className={`p-1 rounded ${widget.width === 1 ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`} title="1 Column Layout"><Minimize2 size={14} /></button>
+                                    <button onClick={() => resizeWidget(widget.id, 2)} className={`p-1 rounded ${widget.width === 2 ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`} title="2 Column Layout"><MoveRight size={14} /></button>
+                                    <button onClick={() => resizeWidget(widget.id, 3)} className={`p-1 rounded ${widget.width === 3 ? 'bg-white dark:bg-slate-800 shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`} title="3 Column Layout"><Maximize2 size={14} /></button>
+                                    <div className="w-px h-4 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+                                    <button onClick={() => removeWidget(widget.id)} className="p-1 rounded text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors" title="Remove Widget"><Trash2 size={14} /></button>
+                                </div>
+                            )}
+
+                            <div className="absolute top-4 left-6 flex items-center justify-between right-6">
+                                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                    {widget.type === 'TRAFFIC' && <><Activity className="w-5 h-5 text-blue-500" /> Traffic & Errors</>}
+                                    {widget.type === 'STATUS' && <>Status Distribution</>}
+                                    {widget.type === 'LATENCY' && <><BarChart2 size={16} className="text-blue-500" /> Latency</>}
+                                    {widget.type === 'HEATMAP' && <><Zap className="w-5 h-5 text-yellow-500" /> Hourly Intensity</>}
+                                    {widget.type === 'ENDPOINTS' && <>Slowest Endpoints / Commands</>}
+                                </h3>
+                            </div>
+
+                            <div className="flex-1 flex flex-col relative w-full h-full min-h-[250px]">
+                                {widget.type === 'TRAFFIC' && <TrafficChart data={stats} theme={settings.theme} />}
+                                {widget.type === 'STATUS' && (
+                                    <>
+                                        <div className="flex-1 min-h-[0px]">
+                                            <StatusDistribution 
+                                              data={stats} 
+                                              theme={settings.theme} 
+                                              onStatusClick={(status) => {
+                                                toggleStatusClass(status);
+                                                setShowFilters(true);
+                                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                              }} 
+                                            />
+                                        </div>
+                                        <div className="mt-4 flex flex-wrap gap-4 text-xs justify-center pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                                            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span><span>2xx / Success</span></div>
+                                            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300"><span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span><span>3xx</span></div>
+                                            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span><span>4xx</span></div>
+                                            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300"><span className="w-2.5 h-2.5 rounded-full bg-red-500"></span><span>5xx / Error</span></div>
+                                        </div>
+                                    </>
+                                )}
+                                {widget.type === 'LATENCY' && (
+                                  <LatencyHistogram 
+                                    data={stats} 
+                                    theme={settings.theme} 
+                                    onBarClick={(min, max) => {
+                                      setMinLatency(min.toString());
+                                      setMaxLatency(max.toString());
+                                      setShowFilters(true);
+                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }} 
+                                  />
+                                )}
+                                {widget.type === 'HEATMAP' && <HeatmapGrid data={stats} theme={settings.theme} />}
+                                {widget.type === 'ENDPOINTS' && (
+                                  <TopEndpointsChart 
+                                    data={stats} 
+                                    theme={settings.theme} 
+                                    onEndpointClick={(path) => {
+                                      setFilterText(path);
+                                      setShowFilters(true);
+                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }} 
+                                  />
+                                )}
+                            </div>
                         </div>
-                        <TopEndpointsChart data={stats} theme={settings.theme} />
-                    </div>
+                    ))}
+
+                    {widgets.length === 0 && (
+                        <div className="col-span-full py-16 text-center bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+                             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 mb-4">
+                                <LayoutDashboard className="text-slate-500 dark:text-slate-400" />
+                             </div>
+                             <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 mb-2">No widgets on the dashboard</h3>
+                             <p className="text-slate-500 dark:text-slate-400 mb-6">Customize your dashboard by adding some widgets.</p>
+                             <button onClick={() => setEditMode(true)} className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition">Customize Dashboard</button>
+                        </div>
+                    )}
                 </div>
             </div>
         )}

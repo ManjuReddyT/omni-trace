@@ -1,5 +1,5 @@
 {
-  "name": "LogPulse Analytics",
+  "name": "OmniTrace",
   "description": "A high-performance log analysis dashboard specialized in Nginx/GCP log parsing, URL normalization, and latency aggregation.",
   "requestFramePermissions": [],
   "majorCapabilities": []

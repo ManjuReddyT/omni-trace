@@ -7,7 +7,7 @@ const About: React.FC = () => {
       
       {/* Header */}
       <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold text-slate-900 dark:text-white">About LogPulse</h1>
+        <h1 className="text-4xl font-bold text-slate-900 dark:text-white">About OmniTrace</h1>
         <p className="text-lg text-slate-600 dark:text-slate-400">
           A client-side, privacy-first log analysis tool for SREs and Developers.
         </p>
@@ -41,9 +41,9 @@ const About: React.FC = () => {
             <div className="flex gap-4">
                 <div className="shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">2</div>
                 <div>
-                    <h3 className="font-bold text-lg text-slate-900 dark:text-white">Upload to LogPulse</h3>
+                    <h3 className="font-bold text-lg text-slate-900 dark:text-white">Upload to OmniTrace</h3>
                     <p className="text-slate-600 dark:text-slate-400 mt-1">
-                        Drag and drop the file into the LogPulse upload area. The processing happens entirely in your browser memory; no data leaves your device.
+                        Drag and drop the file into the OmniTrace upload area. The processing happens entirely in your browser memory; no data leaves your device.
                     </p>
                 </div>
             </div>
@@ -118,7 +118,7 @@ const About: React.FC = () => {
       {/* Footer */}
       <div className="text-center pt-8 border-t border-slate-200 dark:border-slate-800">
         <p className="text-slate-500 text-sm">
-            LogPulse Version 1.2.0 &bull; Built with React, Tailwind & Google GenAI / Ollama
+            OmniTrace Version 1.2.0 &bull; Built with React, Tailwind & Google GenAI / Ollama
         </p>
       </div>
 

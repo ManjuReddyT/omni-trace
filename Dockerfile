@@ -1,8 +1,8 @@
 # --- Instructions ---
 # 1. Build the Docker image:
-#      docker build -t logpulse-analytics .
+#      docker build -t omnitrace .
 # 2. Run the Docker image:
-#      docker run -d -p 8080:80 --name logpulse logpulse-analytics
+#      docker run -d -p 8080:80 --name omnitrace omnitrace
 # 3. Access the app in your browser at http://localhost:8080
 # --------------------
 

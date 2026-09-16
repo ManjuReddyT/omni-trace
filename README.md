@@ -1,6 +1,6 @@
-# LogPulse Analytics
+# OmniTrace
 
-LogPulse Analytics is a modern, high-performance dashboard designed to visualize web server access logs directly in the browser. It specializes in parsing Nginx, GCP, AWS ALB, and Kubernetes logs, normalizing URLs, and visualizing latency distribution.
+OmniTrace is a modern, high-performance dashboard designed to visualize web server access logs directly in the browser. It specializes in parsing Nginx, GCP, AWS ALB, and Kubernetes logs, normalizing URLs, and visualizing latency distribution.
 
 ## 🚀 Features
 
@@ -21,16 +21,16 @@ LogPulse Analytics is a modern, high-performance dashboard designed to visualize
 
 ## 🐳 Docker Deployment
 
-You can quickly deploy and run LogPulse locally using Docker. Our lightweight, multi-stage build makes this easy:
+You can quickly deploy and run OmniTrace locally using Docker. Our lightweight, multi-stage build makes this easy:
 
 1. **Build the Docker image:**
    ```bash
-   docker build -t logpulse-analytics .
+   docker build -t omnitrace .
    ```
 
 2. **Run the Docker container:**
    ```bash
-   docker run -d -p 8080:80 --name logpulse logpulse-analytics
+   docker run -d -p 8080:80 --name omnitrace omnitrace
    ```
 
 3. **Access the app:**
@@ -46,7 +46,7 @@ To use the local AI features:
    ```bash
    OLLAMA_ORIGINS="*" ollama serve
    ```
-4. In LogPulse Settings, select **Ollama** and enter your model name (e.g., `llama3`).
+4. In OmniTrace Settings, select **Ollama** and enter your model name (e.g., `llama3`).
 
 ## 🛠️ Local Development
 

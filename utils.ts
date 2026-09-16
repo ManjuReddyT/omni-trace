@@ -162,6 +162,7 @@ const parseJSONLines = (lines: string[]): ProcessedLogEntry[] => {
                 referer: String(getField(json, ['http_referer', 'jsonPayload.http_referer', 'referer', 'httpRequest.referer']) || '-'),
                 isError: status >= 400 || severity === 'ERROR' || severity === 'CRITICAL',
                 severity,
+                logType: url || method || status > 0 ? 'HTTP' : 'APP',
                 bodyBytes: parseInt(getField(json, ['body_bytes_sent', 'jsonPayload.body_bytes_sent', 'size', 'httpRequest.responseSize']) || '0', 10),
                 rawLine: line,
                 metadata: json
@@ -240,6 +241,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                 referer: referer || '-',
                 isError: status >= 400,
                 severity: determineSeverity(status, ''),
+                logType: 'HTTP',
                 bodyBytes: parseInt(bytesStr, 10),
                 rawLine: line,
                 metadata: {}
@@ -275,6 +277,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                 referer: '-',
                 isError: status >= 400 || parseInt(elbStatus) >= 400,
                 severity: determineSeverity(status, ''),
+                logType: 'HTTP',
                 bodyBytes: 0,
                 rawLine: line,
                 metadata: { source: 'AWS_ALB', elbStatus }
@@ -305,6 +308,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                 referer: '-',
                 isError: status >= 400,
                 severity: determineSeverity(status, ''),
+                logType: 'HTTP',
                 bodyBytes: parseInt(bytesSent, 10),
                 rawLine: line,
                 metadata: { source: 'Envoy', requestId }
@@ -338,6 +342,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                 referer: '-',
                 isError: severity === 'ERROR',
                 severity,
+                logType: httpMatch ? 'HTTP' : 'APP',
                 bodyBytes: 0,
                 rawLine: line,
                 metadata: { source: 'Java', thread, pid, logger }
@@ -378,6 +383,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                 referer: '-',
                 isError: severity === 'ERROR' || severity === 'CRITICAL',
                 severity,
+                logType: 'DATABASE',
                 bodyBytes: 0,
                 rawLine: line,
                 metadata: { source: 'MongoDB', context, component }
@@ -405,6 +411,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                 referer: '-',
                 isError: false,
                 severity,
+                logType: 'DATABASE',
                 bodyBytes: 0,
                 rawLine: line,
                 metadata: { source: 'Redis', role }
@@ -437,6 +444,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                  referer: '-',
                  isError: isErr,
                  severity: isErr ? 'ERROR' : 'INFO',
+                 logType: 'SYSTEM',
                  bodyBytes: 0,
                  rawLine: line,
                  metadata: { pid, pri }
@@ -475,6 +483,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                 referer: '-',
                 isError: severity === 'ERROR',
                 severity,
+                logType: status > 0 ? 'HTTP' : 'APP',
                 bodyBytes: 0,
                 rawLine: line,
                 metadata: { stream }
@@ -518,6 +527,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
                 referer: '-',
                 isError: severity === 'ERROR',
                 severity,
+                logType: 'DATABASE',
                 bodyBytes: 0,
                 rawLine: line,
                 metadata: { pid, user, timezone: tz }
@@ -540,6 +550,7 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
             referer: '-',
             isError: false,
             severity: 'INFO',
+            logType: 'UNKNOWN',
             bodyBytes: 0,
             rawLine: line,
             metadata: {}
@@ -564,6 +575,30 @@ export const parseLogs = (content: string): ProcessedLogEntry[] => {
   return parseRawText(lines);
 };
 
+const parseCSVLine = (line: string, separator: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i++; // skip escaped quote
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === separator && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current);
+    return result.map(c => c.trim().replace(/^'|'$/g, ''));
+};
+
 const parseCSV = (lines: string[]): ProcessedLogEntry[] => {
     // Basic CSV/TSV parser, attempts to auto-detect header row
     // Skips comment lines (common in CloudFront)
@@ -579,7 +614,7 @@ const parseCSV = (lines: string[]): ProcessedLogEntry[] => {
     if (headerLine) {
         headers = headerLine.replace('#Fields:', '').trim().split(/\s+/);
     } else {
-        headers = firstLine.split(separator).map(h => h.trim().replace(/^'|'$/g, ''));
+        headers = parseCSVLine(firstLine, separator);
     }
 
     const findIdx = (keyParts: string[]) => headers.findIndex(h => keyParts.some(k => h.toLowerCase().includes(k)));
@@ -591,7 +626,7 @@ const parseCSV = (lines: string[]): ProcessedLogEntry[] => {
     const idxLatency = findIdx(['time-taken', 'latency', 'duration']); 
 
     return dataLines.slice(headerLine ? 0 : 1).map((line, i) => {
-        const cells = line.split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
+        const cells = parseCSVLine(line, separator);
         if (cells.length < headers.length * 0.5) return null;
 
         const method = cells[idxMethod] || 'MSG';
@@ -631,6 +666,7 @@ const parseCSV = (lines: string[]): ProcessedLogEntry[] => {
             referer: '-',
             isError: status >= 400,
             severity: determineSeverity(status, rawPath),
+            logType: 'HTTP',
             bodyBytes: 0,
             rawLine: line,
             metadata: { source: 'CSV/TSV' }
@@ -669,12 +705,18 @@ export const aggregateStats = (logs: ProcessedLogEntry[]): AggregatedStats => {
 
   const statusCounts: Record<string, number> = {};
   logs.forEach(l => {
-    const cat = Math.floor(l.status / 100) + 'xx';
+    let cat = '';
+    if (l.logType === 'HTTP') {
+      cat = Math.floor(l.status / 100) + 'xx';
+    } else {
+      cat = l.isError ? 'Error' : 'Success';
+    }
     statusCounts[cat] = (statusCounts[cat] || 0) + 1;
   });
 
   const statusColors: Record<string, string> = {
-    '2xx': '#10b981', '3xx': '#3b82f6', '4xx': '#f59e0b', '5xx': '#ef4444', '0xx': '#94a3b8'
+    '2xx': '#10b981', '3xx': '#3b82f6', '4xx': '#f59e0b', '5xx': '#ef4444', '0xx': '#94a3b8',
+    'Success': '#10b981', 'Error': '#ef4444'
   };
 
   const statusDistribution = Object.entries(statusCounts).map(([name, value]) => ({
@@ -683,7 +725,14 @@ export const aggregateStats = (logs: ProcessedLogEntry[]): AggregatedStats => {
 
   const endpointMap: Record<string, { count: number; totalLat: number; errors: number }> = {};
   logs.forEach(l => {
-    const key = `${l.method} ${l.path}`;
+    let key = `${l.method} ${l.path}`;
+    if (l.logType === 'DATABASE') {
+      key = `[DB] ${l.method} ${l.path}`;
+    } else if (l.logType === 'SYSTEM') {
+      key = `[SYS] ${l.path}`;
+    } else if (l.logType === 'APP') {
+      key = `[APP] ${l.method} ${l.path}`;
+    }
     if (!endpointMap[key]) endpointMap[key] = { count: 0, totalLat: 0, errors: 0 };
     endpointMap[key].count++;
     endpointMap[key].totalLat += l.latency;

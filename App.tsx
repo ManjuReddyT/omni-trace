@@ -11,7 +11,7 @@ function App() {
   const [logs, setLogs] = useState<ProcessedLogEntry[] | null>(null);
   const [settings, setSettings] = useState<AppSettings>(() => {
     // Try to load from local storage
-    const saved = localStorage.getItem('logpulse_settings');
+    const saved = localStorage.getItem('omnitrace_settings');
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
   
@@ -26,7 +26,7 @@ function App() {
     } else {
         root.classList.remove('dark');
     }
-    localStorage.setItem('logpulse_settings', JSON.stringify(settings));
+    localStorage.setItem('omnitrace_settings', JSON.stringify(settings));
   }, [settings]);
 
   const handleDataLoaded = useCallback((content: string, isAppend: boolean = false) => {
