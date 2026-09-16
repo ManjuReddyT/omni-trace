@@ -3,7 +3,7 @@ import { UploadCloud, FileText, Globe, Server, Code, Database, Zap, Clipboard, L
 import { unzipSync, gunzipSync } from 'fflate';
 
 interface FileUploadProps {
-  onDataLoaded: (content: string, isAppend?: boolean) => void;
+  onDataLoaded: (content: string, isAppend?: boolean) => void | Promise<void>;
 }
 
 const SAMPLE_LOGS: Record<string, string> = {
