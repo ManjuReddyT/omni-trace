@@ -2,6 +2,8 @@
 
 OmniTrace is a Vite + React + TypeScript app. Processing happens entirely in the browser.
 
+**Production:** [https://trace.sreroot.com](https://trace.sreroot.com)
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+ (22 recommended)
@@ -23,7 +25,8 @@ Open the URL Vite prints (default `http://localhost:3000`).
 | Command | What it does |
 |---|---|
 | `npm run dev` | Vite dev server on port 3000 |
-| `npm test` | Parser fixture tests (Vitest) |
+| `npm test` | Parser and engine tests (Vitest) |
+| `npm run test:e2e` | Playwright smoke: sample → dashboard |
 | `npm run build` | Production bundle to `dist/` |
 | `npm run preview` | Serve the production build |
 
@@ -36,6 +39,10 @@ Ollama is the default AI provider. Keys are never written to `localStorage`.
 3. In OmniTrace Settings, confirm provider **Ollama** and model name.
 
 Gemini is opt-in. If you select it, aggregated stats leave the browser, and the API key stays in memory for the tab session only.
+
+## Production (Vercel)
+
+The app is live at [trace.sreroot.com](https://trace.sreroot.com). The GitHub `main` branch is linked; every push deploys. Config is in `vercel.json`.
 
 ## Docker
 

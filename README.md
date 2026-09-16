@@ -1,51 +1,45 @@
 # OmniTrace
 
-OmniTrace is a modern, high-performance dashboard designed to visualize web server access logs directly in the browser. It specializes in parsing Nginx, GCP, AWS ALB, and Kubernetes logs, normalizing URLs, and visualizing latency distribution.
+**Live:** [https://trace.sreroot.com](https://trace.sreroot.com)
 
-## 🚀 Features
+Client-side log analytics. Parse Nginx, GCP, AWS ALB, Envoy, CloudFront, Kubernetes, PostgreSQL, MongoDB, Redis, and Spring Boot in the browser. Raw logs never leave the device.
 
-- **Privacy-First**: All log processing happens 100% locally in your browser. Raw log files are never uploaded.
-- **Universal Parsing**: Nginx, GCP, AWS ALB, Kubernetes, PostgreSQL, MongoDB, Redis, Spring Boot, Envoy, and CloudFront.
-- **AI Integration**:
-  - **Ollama** (default): local LLM, nothing leaves the machine.
-  - **Google Gemini**: opt-in cloud analysis. Aggregated stats leave the browser; the API key is session-only and never written to `localStorage`.
-- **Theming**: Dark and Light mode support.
-- **Visualizations**: Traffic Volume, Latency Heatmaps, Status Code Distribution, Drain pattern clustering.
-- **Session restore**: Last parsed logs stay in IndexedDB in this browser (never uploaded).
+## Features
 
-## 📋 Usage
+- **Privacy-first** — parsing, clustering, and stats run locally (Web Worker). IndexedDB restores the last session in this browser only.
+- **Formats** — JSON/GCP, Nginx/Apache CLF, AWS ALB, Envoy, CloudFront TSV, Kubernetes CRI, PostgreSQL, MongoDB, Redis, Spring Boot.
+- **SRE views** — golden signals, Drain pattern clustering, per-endpoint anomaly baselines, virtualized log explorer.
+- **AI** — Ollama by default (nothing leaves the machine). Gemini is opt-in; aggregated stats leave the browser; the API key is session-only and never written to `localStorage`.
 
-1. **Upload Logs**: Drag and drop your `.log`, `.txt`, `.csv`, `.zip`, or `.gz` files onto the drop zone.
-2. **Settings**: Click the gear icon to toggle Dark/Light mode or configure your AI provider (Ollama or Gemini).
-3. **Analyze**: Use the filter bar to drill down into specific error events or high-latency requests.
+## Usage
 
-## 🛠️ Local Development
+1. Open [trace.sreroot.com](https://trace.sreroot.com) (or run locally).
+2. Drop `.log`, `.txt`, `.csv`, `.zip`, or `.gz` files, paste, stream, or load a sample.
+3. Filter, then use Overview / Logs / Patterns / Anomalies / AI.
+
+## Local development
 
 ```bash
 npm install
 npm run dev      # http://localhost:3000
-npm test         # engine + parser fixtures
+npm test         # parser + engine fixtures
 npm run test:e2e # Playwright smoke (sample → dashboard)
 ```
 
-See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for Docker and Ollama details.
+See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for Docker and Ollama.
 
-## 🐳 Docker Deployment
+## Deploy
+
+Production is [trace.sreroot.com](https://trace.sreroot.com), a custom domain on Vercel. Pushes to `main` deploy automatically (`vercel.json`).
 
 ```bash
 docker build -t omnitrace .
 docker run -d -p 8080:80 --name omnitrace omnitrace
 ```
 
-Open `http://localhost:8080`.
-
-## Vercel
-
-Vite static app (`vercel.json`). Grant the [Vercel GitHub app](https://github.com/apps/vercel) access to `omni-trace`, or import the repo at [vercel.com/new](https://vercel.com/new/import?s=https://github.com/ManjuReddyT/omni-trace). Pushes to `main` then deploy automatically.
-
-## 🤖 Ollama Setup
+## Ollama
 
 1. [Install Ollama](https://ollama.com/).
-2. Run a model: `ollama run llama3`.
+2. `ollama run llama3`
 3. Allow CORS: `OLLAMA_ORIGINS="*" ollama serve`
-4. In OmniTrace Settings, select **Ollama** and enter your model name (e.g. `llama3`).
+4. In Settings, select **Ollama** and the model name.
