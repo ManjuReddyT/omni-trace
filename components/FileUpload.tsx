@@ -16,6 +16,11 @@ const SAMPLE_LOGS: Record<string, string> = {
 {"httpRequest":{"requestMethod":"DELETE","requestUrl":"https://api.example.com/sessions/abc123","status":200,"responseSize":"64","userAgent":"Mozilla/5.0","remoteIp":"192.0.2.45","latency":"0.078s"},"timestamp":"2025-01-17T14:32:31.123Z","severity":"INFO"}
 {"httpRequest":{"requestMethod":"GET","requestUrl":"https://api.example.com/api/payments","status":503,"responseSize":"256","userAgent":"axios/1.6.0","remoteIp":"203.0.113.12","latency":"5.234s"},"timestamp":"2025-01-17T14:32:34.456Z","severity":"ERROR"}`,
 
+    'Application Logs (JSON)': `{"ts":"2025-01-17T14:32:01.123Z","level":"INFO","method":"GET","path":"/api/users","status":200,"duration":45,"msg":"handled request"}
+{"ts":"2025-01-17T14:32:15.456Z","level":"ERROR","method":"POST","path":"/api/orders","status":500,"duration":2100,"msg":"payment provider timeout"}
+{"ts":"2025-01-17T14:32:18.789Z","level":"WARN","method":"GET","path":"/api/inventory","status":429,"duration":12,"msg":"rate limited"}
+{"ts":"2025-01-17T14:32:25.567Z","level":"INFO","method":"DELETE","path":"/sessions/abc","status":204,"duration":8,"msg":"session revoked"}`,
+
     'Nginx Access Logs': `203.0.113.42 - - [17/Jan/2025:14:32:01 +0000] "GET /api/users/123 HTTP/1.1" 200 1234 "-" "Mozilla/5.0"
 198.51.100.23 - - [17/Jan/2025:14:32:15 +0000] "POST /api/orders HTTP/1.1" 500 512 "-" "axios/1.6.0"
 192.0.2.1 - - [17/Jan/2025:14:32:18 +0000] "GET /api/products HTTP/1.1" 200 8912 "https://example.com" "PostmanRuntime"
@@ -308,7 +313,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
   };
 
   const loadSample = (type: string) => {
-    onDataLoaded(SAMPLE_LOGS[type]);
+    const sample = SAMPLE_LOGS[type];
+    if (!sample) {
+      console.error(`No sample logs defined for "${type}"`);
+      return;
+    }
+    onDataLoaded(sample);
   };
 
   return (

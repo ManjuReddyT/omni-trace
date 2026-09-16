@@ -4,63 +4,42 @@ OmniTrace is a modern, high-performance dashboard designed to visualize web serv
 
 ## 🚀 Features
 
-- **Privacy-First**: All log processing happens 100% locally in your browser. No data is uploaded to any server.
-- **Universal Parsing**: Expanded support! Now deeply parses Nginx, GCP, AWS ALB, Kubernetes, PostgreSQL, MongoDB, Redis, Spring Boot, Envoy, and CloudFront access logs.
+- **Privacy-First**: All log processing happens 100% locally in your browser. Raw log files are never uploaded.
+- **Universal Parsing**: Nginx, GCP, AWS ALB, Kubernetes, PostgreSQL, MongoDB, Redis, Spring Boot, Envoy, and CloudFront.
 - **AI Integration**:
-  - **Google Gemini**: Cloud-based analysis.
-  - **Ollama**: **NEW!** Local LLM support for privacy-conscious users.
-- **Theming**: **NEW!** Dark and Light mode support.
-- **About Page**: **NEW!** Detailed descriptions and sample log snippets for MongoDB, Redis, Spring Boot, Envoy, and CloudFront log formats.
+  - **Ollama** (default): local LLM, nothing leaves the machine.
+  - **Google Gemini**: opt-in cloud analysis. Aggregated stats leave the browser; the API key is session-only and never written to `localStorage`.
+- **Theming**: Dark and Light mode support.
 - **Visualizations**: Traffic Volume, Latency Heatmaps, Status Code Distribution, Pattern Clustering.
 
 ## 📋 Usage
 
 1. **Upload Logs**: Drag and drop your `.log`, `.txt`, `.csv`, `.zip`, or `.gz` files onto the drop zone.
-2. **Settings**: Click the gear icon to toggle Dark/Light mode or configure your AI provider (Gemini or Ollama).
+2. **Settings**: Click the gear icon to toggle Dark/Light mode or configure your AI provider (Ollama or Gemini).
 3. **Analyze**: Use the filter bar to drill down into specific error events or high-latency requests.
-
-## 🐳 Docker Deployment
-
-You can quickly deploy and run OmniTrace locally using Docker. Our lightweight, multi-stage build makes this easy:
-
-1. **Build the Docker image:**
-   ```bash
-   docker build -t omnitrace .
-   ```
-
-2. **Run the Docker container:**
-   ```bash
-   docker run -d -p 8080:80 --name omnitrace omnitrace
-   ```
-
-3. **Access the app:**
-   Open `http://localhost:8080` in your browser.
-
-## 🤖 Ollama Setup
-
-To use the local AI features:
-
-1. [Install Ollama](https://ollama.com/).
-2. Run a model: `ollama run llama3`.
-3. Ensure Ollama allows CORS. Run:
-   ```bash
-   OLLAMA_ORIGINS="*" ollama serve
-   ```
-4. In OmniTrace Settings, select **Ollama** and enter your model name (e.g., `llama3`).
 
 ## 🛠️ Local Development
 
-1. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm test         # parser fixtures
+```
 
-2. **Start the development server**:
-   ```bash
-   npm run dev
-   ```
+See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for Docker and Ollama details.
 
-3. **Configure AI (Optional)**:
-   - Click the gear icon to open **Settings**.
-   - Choose between **Google Gemini** (requires API key) or **Ollama** (requires local installation).
-   - Follow the in-app instructions to configure your chosen AI provider for insightful log analysis.
+## 🐳 Docker Deployment
+
+```bash
+docker build -t omnitrace .
+docker run -d -p 8080:80 --name omnitrace omnitrace
+```
+
+Open `http://localhost:8080`.
+
+## 🤖 Ollama Setup
+
+1. [Install Ollama](https://ollama.com/).
+2. Run a model: `ollama run llama3`.
+3. Allow CORS: `OLLAMA_ORIGINS="*" ollama serve`
+4. In OmniTrace Settings, select **Ollama** and enter your model name (e.g. `llama3`).

@@ -40,6 +40,33 @@ const WIDGET_OPTIONS = [
   { type: 'ENDPOINTS', label: 'Slowest Endpoints', icon: Activity },
 ];
 
+const DASHBOARD_TABS: { id: Tab; icon: typeof LayoutDashboard; label: string }[] = [
+  { id: 'OVERVIEW', icon: LayoutDashboard, label: 'Overview' },
+  { id: 'EXPLORER', icon: FileText, label: 'Logs' },
+  { id: 'PATTERNS', icon: Layers, label: 'Patterns' },
+  { id: 'ANOMALIES', icon: AlertTriangle, label: 'Anomalies' },
+  { id: 'AI', icon: Sparkles, label: 'AI Insight' },
+];
+
+const INACTIVE_CHIP = 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500';
+
+const LOG_TYPE_ACTIVE: Record<string, string> = {
+  HTTP: 'bg-blue-100 dark:bg-blue-500/20 border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-400',
+  DATABASE: 'bg-indigo-100 dark:bg-indigo-500/20 border-indigo-400 dark:border-indigo-500 text-indigo-700 dark:text-indigo-400',
+  SYSTEM: 'bg-purple-100 dark:bg-purple-500/20 border-purple-400 dark:border-purple-500 text-purple-700 dark:text-purple-400',
+  APP: 'bg-emerald-100 dark:bg-emerald-500/20 border-emerald-400 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400',
+  UNKNOWN: 'bg-slate-200 dark:bg-slate-500/20 border-slate-400 dark:border-slate-500 text-slate-700 dark:text-slate-300',
+};
+
+const STATUS_ACTIVE: Record<string, string> = {
+  '2xx': 'bg-emerald-100 dark:bg-emerald-500/20 border-emerald-400 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400',
+  Success: 'bg-emerald-100 dark:bg-emerald-500/20 border-emerald-400 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400',
+  '3xx': 'bg-blue-100 dark:bg-blue-500/20 border-blue-400 dark:border-blue-500 text-blue-700 dark:text-blue-400',
+  '4xx': 'bg-amber-100 dark:bg-amber-500/20 border-amber-400 dark:border-amber-500 text-amber-700 dark:text-amber-400',
+  '5xx': 'bg-red-100 dark:bg-red-500/20 border-red-400 dark:border-red-500 text-red-700 dark:text-red-400',
+  Error: 'bg-red-100 dark:bg-red-500/20 border-red-400 dark:border-red-500 text-red-700 dark:text-red-400',
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
   const [activeTab, setActiveTab] = useUrlState<Tab>('tab', 'OVERVIEW');
   const [filterText, setFilterText] = useUrlState('search', '');
@@ -229,13 +256,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                 <div className="flex items-center gap-3 pr-20">
                     {/* Tab Navigation */}
                     <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg border border-slate-200 dark:border-slate-700/50 mr-4">
-                        {[
-                            { id: 'OVERVIEW', icon: LayoutDashboard, label: 'Overview' },
-                            { id: 'EXPLORER', icon: FileText, label: 'Logs' },
-                            { id: 'PATTERNS', icon: Layers, label: 'Patterns' },
-                            { id: 'ANOMALIES', icon: AlertTriangle, label: 'Anomalies' },
-                            { id: 'AI', icon: Sparkles, label: 'AI Insight' },
-                        ].map(tab => (
+                        {DASHBOARD_TABS.map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as Tab)}
@@ -284,6 +305,28 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                 </div>
             </div>
 
+            {/* Mobile tab switcher */}
+            <div className="md:hidden flex items-center gap-1 overflow-x-auto pb-3 -mt-1" role="tablist" aria-label="Dashboard views">
+                {DASHBOARD_TABS.map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        role="tab"
+                        aria-selected={activeTab === tab.id}
+                        aria-label={`Switch to ${tab.label} dashboard view`}
+                        className={`
+                            flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all
+                            ${activeTab === tab.id
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}
+                        `}
+                    >
+                        <tab.icon size={14} />
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
             {/* Expandable Filter Bar */}
             {(showFilters || activeFilterCount > 0) && (
                 <div className="py-4 border-t border-slate-200 dark:border-slate-800 space-y-4 animate-in slide-in-from-top-2 duration-200">
@@ -315,12 +358,6 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                             <div className="flex items-center gap-2">
                                 {['HTTP', 'DATABASE', 'SYSTEM', 'APP', 'UNKNOWN'].map((type) => {
                                     const isActive = selectedLogTypes.includes(type);
-                                    let color = 'slate';
-                                    if (type === 'HTTP') color = 'blue';
-                                    if (type === 'DATABASE') color = 'indigo';
-                                    if (type === 'SYSTEM') color = 'purple';
-                                    if (type === 'APP') color = 'emerald';
-
                                     return (
                                         <button
                                             key={type}
@@ -328,9 +365,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                             aria-label={`Toggle ${type} log type filter`}
                                             className={`
                                                 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all
-                                                ${isActive 
-                                                    ? `bg-${color}-100 dark:bg-${color}-500/20 border-${color}-400 dark:border-${color}-500 text-${color}-700 dark:text-${color}-400` 
-                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500'}
+                                                ${isActive ? (LOG_TYPE_ACTIVE[type] || INACTIVE_CHIP) : INACTIVE_CHIP}
                                             `}
                                         >
                                             {type}
@@ -362,12 +397,6 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                             <div className="flex items-center gap-2">
                                 {['2xx', '3xx', '4xx', '5xx', 'Success', 'Error'].map((cls) => {
                                     const isActive = selectedStatusClasses.includes(cls);
-                                    let color = 'slate';
-                                    if (cls === '2xx' || cls === 'Success') color = 'emerald';
-                                    if (cls === '3xx') color = 'blue';
-                                    if (cls === '4xx') color = 'amber';
-                                    if (cls === '5xx' || cls === 'Error') color = 'red';
-
                                     return (
                                         <button
                                             key={cls}
@@ -375,9 +404,7 @@ const Dashboard: React.FC<DashboardProps> = ({ logs, onReset, settings }) => {
                                             aria-label={`Toggle ${cls} status category filter`}
                                             className={`
                                                 px-3 py-1.5 rounded-lg text-xs font-mono border transition-all
-                                                ${isActive 
-                                                    ? `bg-${color}-100 dark:bg-${color}-500/20 border-${color}-400 dark:border-${color}-500 text-${color}-700 dark:text-${color}-400` 
-                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500'}
+                                                ${isActive ? (STATUS_ACTIVE[cls] || INACTIVE_CHIP) : INACTIVE_CHIP}
                                             `}
                                         >
                                             {cls}

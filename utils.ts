@@ -424,8 +424,8 @@ const parseRawText = (lines: string[]): ProcessedLogEntry[] => {
              const [, pri, timestamp, host, appName, pid, message] = match;
              const normalized = normalizePath(message);
              
-             // Try to extract implicit status code from message
-             const statusMatch = message.match(/ (\d{3}) /);
+             // Try to extract implicit status code from message (including EOL)
+             const statusMatch = message.match(/\s(\d{3})(?:\s|$)/);
              const status = statusMatch ? parseInt(statusMatch[1], 10) : 0;
              const isErr = status >= 400 || message.toLowerCase().includes('error') || message.toLowerCase().includes('fail');
              
@@ -567,13 +567,19 @@ export const parseLogs = (content: string): ProcessedLogEntry[] => {
       return parseJSONLines(lines);
   }
 
-  // Fallback to TSV/CSV if header exists
-  if (lines[0].includes('\t') || (lines[0].includes(',') && lines[0].includes('status'))) {
+  const head = lines.slice(0, 8);
+  const looksLikeCsv =
+    head.some(l => l.startsWith('#Fields:')) ||
+    lines[0].includes('\t') ||
+    (lines[0].includes(',') && /status/i.test(lines[0]));
+
+  if (looksLikeCsv) {
       return parseCSV(lines);
   }
 
   return parseRawText(lines);
 };
+
 
 const parseCSVLine = (line: string, separator: string): string[] => {
     const result: string[] = [];

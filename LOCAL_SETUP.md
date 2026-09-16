@@ -1,99 +1,45 @@
 # Local Setup Guide
 
-This project is built with React, TypeScript, and Tailwind CSS. While it runs in browser-based environments, here is how to set it up locally on your machine.
+OmniTrace is a Vite + React + TypeScript app. Processing happens entirely in the browser.
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) (Version 16 or higher)
-- npm or yarn
+- [Node.js](https://nodejs.org/) 18+ (22 recommended)
+- npm
 
-## Step-by-Step Installation
-
-### 1. Initialize the Project
-
-We recommend using [Vite](https://vitejs.dev/) for a fast development experience.
+## Install and run
 
 ```bash
-# Create a new project using the React TypeScript template
-npm create vite@latest omnitrace -- --template react-ts
-
-# Navigate into the directory
-cd omnitrace
-
-# Install dependencies
+git clone https://github.com/ManjuReddyT/omni-trace.git
+cd omni-trace
 npm install
-```
-
-### 2. Install Required Libraries
-
-Install the specific libraries used in OmniTrace:
-
-```bash
-npm install lucide-react recharts
-```
-
-### 3. Configure Tailwind CSS
-
-Install Tailwind and its peer dependencies:
-
-```bash
-npm install -D tailwindcss postcss autoprefixer
-npx tailwindcss init -p
-```
-
-Update your `tailwind.config.js` to look like this:
-
-```javascript
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-```
-
-Add the Tailwind directives to `src/index.css`:
-
-```css
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-body {
-  background-color: #0f172a; /* Slate 900 */
-  color: #e2e8f0; /* Slate 200 */
-}
-```
-
-### 4. Organize Source Files
-
-1.  **Delete** the default files in `src/` (`App.css`, `App.tsx`, `index.css`, `main.tsx`).
-2.  **Copy** the files from this repository into `src/` keeping the folder structure:
-    *   `src/App.tsx`
-    *   `src/index.tsx` (Rename this to `main.tsx` for standard Vite setup)
-    *   `src/types.ts`
-    *   `src/utils.ts`
-    *   `src/components/Dashboard.tsx`
-    *   `src/components/FileUpload.tsx`
-    *   `src/components/StatsCard.tsx`
-    *   `src/components/Charts.tsx`
-
-### 5. Run the Application
-
-Start the development server:
-
-```bash
 npm run dev
 ```
 
-Open your browser to `http://localhost:5173` (or the port shown in your terminal).
+Open the URL Vite prints (default `http://localhost:3000`).
 
-## Troubleshooting
+## Scripts
 
-- **Index Import Error**: If you see an error about `index.html`, ensure `src/main.tsx` is correctly referenced in the `<script type="module" src="/src/main.tsx"></script>` tag inside `index.html`.
-- **Type Errors**: Ensure `tsconfig.json` is set up (Vite handles this by default).
+| Command | What it does |
+|---|---|
+| `npm run dev` | Vite dev server on port 3000 |
+| `npm test` | Parser fixture tests (Vitest) |
+| `npm run build` | Production bundle to `dist/` |
+| `npm run preview` | Serve the production build |
+
+## Optional: local AI (Ollama)
+
+Ollama is the default AI provider. Keys are never written to `localStorage`.
+
+1. Install [Ollama](https://ollama.com/) and run `ollama run llama3`.
+2. Allow browser calls: `OLLAMA_ORIGINS="*" ollama serve`
+3. In OmniTrace Settings, confirm provider **Ollama** and model name.
+
+Gemini is opt-in. If you select it, aggregated stats leave the browser, and the API key stays in memory for the tab session only.
+
+## Docker
+
+```bash
+docker build -t omnitrace .
+docker run -d -p 8080:80 --name omnitrace omnitrace
+```

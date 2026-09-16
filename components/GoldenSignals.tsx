@@ -1,28 +1,67 @@
 import React from 'react';
 import { GoldenSignals as IGoldenSignals } from '../types';
-import { Activity, Clock, AlertOctagon, BatteryCharging } from 'lucide-react';
+import { Activity, Clock, AlertOctagon, BatteryCharging, LucideIcon } from 'lucide-react';
 
 interface Props {
   data: IGoldenSignals;
 }
 
-const SignalCard = ({ label, value, unit, icon: Icon, color, detail }: any) => (
-  <div className={`bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl p-5 flex items-start gap-4 relative overflow-hidden group hover:border-${color}-500/50 transition-all shadow-sm dark:shadow-none`}>
-    <div className={`p-3 rounded-lg bg-${color}-100 dark:bg-${color}-500/10 text-${color}-600 dark:text-${color}-500 group-hover:bg-${color}-200 dark:group-hover:bg-${color}-500/20 transition-colors`}>
-      <Icon size={24} />
-    </div>
-    <div className="z-10">
-      <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">{label}</p>
-      <div className="flex items-baseline gap-1">
-        <span className="text-3xl font-mono font-bold text-slate-800 dark:text-slate-100">{value}</span>
-        <span className="text-sm text-slate-500 font-mono">{unit}</span>
+const COLOR_STYLES: Record<string, { card: string; icon: string; glow: string }> = {
+  amber: {
+    card: 'hover:border-amber-500/50',
+    icon: 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-500 group-hover:bg-amber-200 dark:group-hover:bg-amber-500/20',
+    glow: 'bg-amber-500/5 group-hover:bg-amber-500/10',
+  },
+  blue: {
+    card: 'hover:border-blue-500/50',
+    icon: 'bg-blue-100 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 group-hover:bg-blue-200 dark:group-hover:bg-blue-500/20',
+    glow: 'bg-blue-500/5 group-hover:bg-blue-500/10',
+  },
+  red: {
+    card: 'hover:border-red-500/50',
+    icon: 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 group-hover:bg-red-200 dark:group-hover:bg-red-500/20',
+    glow: 'bg-red-500/5 group-hover:bg-red-500/10',
+  },
+  purple: {
+    card: 'hover:border-purple-500/50',
+    icon: 'bg-purple-100 dark:bg-purple-500/10 text-purple-600 dark:text-purple-500 group-hover:bg-purple-200 dark:group-hover:bg-purple-500/20',
+    glow: 'bg-purple-500/5 group-hover:bg-purple-500/10',
+  },
+};
+
+const SignalCard = ({
+  label,
+  value,
+  unit,
+  icon: Icon,
+  color,
+  detail,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  icon: LucideIcon;
+  color: keyof typeof COLOR_STYLES;
+  detail: string;
+}) => {
+  const styles = COLOR_STYLES[color];
+  return (
+    <div className={`bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-xl p-5 flex items-start gap-4 relative overflow-hidden group ${styles.card} transition-all shadow-sm dark:shadow-none`}>
+      <div className={`p-3 rounded-lg ${styles.icon} transition-colors`}>
+        <Icon size={24} />
       </div>
-      <p className="text-xs text-slate-500 mt-2">{detail}</p>
+      <div className="z-10">
+        <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">{label}</p>
+        <div className="flex items-baseline gap-1">
+          <span className="text-3xl font-mono font-bold text-slate-800 dark:text-slate-100">{value}</span>
+          <span className="text-sm text-slate-500 font-mono">{unit}</span>
+        </div>
+        <p className="text-xs text-slate-500 mt-2">{detail}</p>
+      </div>
+      <div className={`absolute -right-6 -bottom-6 w-24 h-24 ${styles.glow} rounded-full blur-2xl transition-all`} />
     </div>
-    {/* Decorative glow - only visible in dark mode primarily, subtle in light */}
-    <div className={`absolute -right-6 -bottom-6 w-24 h-24 bg-${color}-500/5 rounded-full blur-2xl group-hover:bg-${color}-500/10 transition-all`} />
-  </div>
-);
+  );
+};
 
 const GoldenSignals: React.FC<Props> = ({ data }) => {
   return (

@@ -107,8 +107,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onUpdate, onClo
                     placeholder="Enter Google GenAI API Key"
                     className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 outline-none"
                  />
-                 <p className="text-xs text-slate-500">
-                    If using `process.env.API_KEY`, leave blank or override here.
+                 <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg p-3">
+                    Gemini runs in the cloud. Aggregated stats and log patterns leave this browser. The API key is kept in memory for this tab only — it is never written to localStorage.
                  </p>
               </div>
             )}
