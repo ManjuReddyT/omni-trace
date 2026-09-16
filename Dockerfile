@@ -13,7 +13,7 @@ WORKDIR /app
 
 # Copy package.json and install dependencies separately to cache the layer
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copy the rest of the application files
 COPY . .

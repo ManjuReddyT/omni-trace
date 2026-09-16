@@ -10,7 +10,8 @@ OmniTrace is a modern, high-performance dashboard designed to visualize web serv
   - **Ollama** (default): local LLM, nothing leaves the machine.
   - **Google Gemini**: opt-in cloud analysis. Aggregated stats leave the browser; the API key is session-only and never written to `localStorage`.
 - **Theming**: Dark and Light mode support.
-- **Visualizations**: Traffic Volume, Latency Heatmaps, Status Code Distribution, Pattern Clustering.
+- **Visualizations**: Traffic Volume, Latency Heatmaps, Status Code Distribution, Drain pattern clustering.
+- **Session restore**: Last parsed logs stay in IndexedDB in this browser (never uploaded).
 
 ## 📋 Usage
 
@@ -23,7 +24,8 @@ OmniTrace is a modern, high-performance dashboard designed to visualize web serv
 ```bash
 npm install
 npm run dev      # http://localhost:3000
-npm test         # parser fixtures
+npm test         # engine + parser fixtures
+npm run test:e2e # Playwright smoke (sample → dashboard)
 ```
 
 See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for Docker and Ollama details.

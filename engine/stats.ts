@@ -1,11 +1,6 @@
 import { AggregatedStats, ProcessedLogEntry } from '../types';
+import { bucketTimestamp, calculatePercentile, detectAnomalies, saturationScore } from './analytics';
 import { clusterLogs } from './cluster';
-
-const calculatePercentile = (sorted: number[], percentile: number) => {
-  if (sorted.length === 0) return 0;
-  const index = Math.ceil((percentile / 100) * sorted.length) - 1;
-  return sorted[Math.max(0, index)];
-};
 
 export function aggregateStats(logs: ProcessedLogEntry[]): AggregatedStats {
   const totalRequests = logs.length;
@@ -80,16 +75,18 @@ export function aggregateStats(logs: ProcessedLogEntry[]): AggregatedStats {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  const timeMap: Record<string, { count: number; errors: number; totalLat: number }> = {};
   let minTime = Infinity;
   let maxTime = 0;
-
   logs.forEach((l) => {
     const t = new Date(l.timestamp).getTime();
     if (t < minTime) minTime = t;
     if (t > maxTime) maxTime = t;
+  });
+  const spanMs = Math.max(0, maxTime - minTime);
 
-    const bucket = l.timestamp.substring(0, 16).replace('T', ' ');
+  const timeMap: Record<string, { count: number; errors: number; totalLat: number }> = {};
+  logs.forEach((l) => {
+    const bucket = bucketTimestamp(l.timestamp, spanMs);
     if (!timeMap[bucket]) timeMap[bucket] = { count: 0, errors: 0, totalLat: 0 };
     timeMap[bucket].count++;
     timeMap[bucket].totalLat += l.latency;
@@ -103,7 +100,7 @@ export function aggregateStats(logs: ProcessedLogEntry[]): AggregatedStats {
       errorCount: data.errors,
       avgLatency: data.totalLat / data.count,
     }))
-    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    .sort((a, b) => a.time.localeCompare(b.time));
 
   const methodCounts: Record<string, number> = {};
   logs.forEach((l) => {
@@ -111,13 +108,16 @@ export function aggregateStats(logs: ProcessedLogEntry[]): AggregatedStats {
   });
   const methodDistribution = Object.entries(methodCounts).map(([name, value]) => ({ name, value }));
 
-  const durationSeconds = (maxTime - minTime) / 1000;
+  const durationSeconds = spanMs / 1000;
   const traffic = durationSeconds > 0 ? totalRequests / durationSeconds : totalRequests;
+  const p50 = calculatePercentile(latencies, 50);
   const p95 = calculatePercentile(latencies, 95);
+  const errorRate = (errorCount / totalRequests) * 100;
+  const meanLat = totalLatency / totalRequests;
 
   const histogramBuckets = 20;
   const maxLat = p95 * 1.5;
-  const bucketSize = maxLat / histogramBuckets;
+  const bucketSize = maxLat / histogramBuckets || 1;
   const histogram: Record<number, number> = {};
   for (let i = 0; i < histogramBuckets; i++) histogram[i] = 0;
 
@@ -151,31 +151,14 @@ export function aggregateStats(logs: ProcessedLogEntry[]): AggregatedStats {
     errorRate: data.count > 0 ? data.errors / data.count : 0,
   }));
 
-  const meanLat = totalLatency / totalRequests;
-  const variance = latencies.reduce((sum, val) => sum + Math.pow(val - meanLat, 2), 0) / totalRequests;
-  const stdDev = Math.sqrt(variance);
-
-  const anomalies = logs
-    .map((l) => {
-      const zScore = (l.latency - meanLat) / (stdDev || 1);
-      return { ...l, anomalyScore: zScore };
-    })
-    .filter((l) => {
-      const isOutlier = l.anomalyScore! > 3 && l.latency > 100;
-      const isCritical = l.status >= 500;
-      return isOutlier || isCritical;
-    })
-    .sort((a, b) => b.latency - a.latency)
-    .slice(0, 50);
-
   return {
     totalRequests,
     avgLatency: meanLat,
-    p50Latency: calculatePercentile(latencies, 50),
+    p50Latency: p50,
     p90Latency: calculatePercentile(latencies, 90),
     p95Latency: p95,
     p99Latency: calculatePercentile(latencies, 99),
-    errorRate: (errorCount / totalRequests) * 100,
+    errorRate,
     totalBytes,
     requestsOverTime,
     statusDistribution,
@@ -184,12 +167,12 @@ export function aggregateStats(logs: ProcessedLogEntry[]): AggregatedStats {
     goldenSignals: {
       latency: p95,
       traffic,
-      errors: (errorCount / totalRequests) * 100,
-      saturation: Math.min((traffic / 100) * 100, 100),
+      errors: errorRate,
+      saturation: saturationScore({ traffic, p50, p95, errorRate }),
     },
     clusters: clusterLogs(logs),
     latencyHistogram,
     trafficHeatmap,
-    anomalies,
+    anomalies: detectAnomalies(logs),
   };
 }

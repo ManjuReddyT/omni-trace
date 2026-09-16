@@ -11,10 +11,25 @@ export { TEXT_PARSERS, genericParser } from './text';
 
 export const PARSERS: LogParser[] = [jsonParser, csvParser, ...TEXT_PARSERS];
 
+const plugins: LogParser[] = [];
+
+/** Runtime extension point for custom formats. Returns an unregister function. */
+export function registerParser(parser: LogParser): () => void {
+  plugins.push(parser);
+  return () => {
+    const i = plugins.indexOf(parser);
+    if (i >= 0) plugins.splice(i, 1);
+  };
+}
+
+function allParsers(): LogParser[] {
+  return plugins.length ? [...plugins, ...PARSERS] : PARSERS;
+}
+
 export function detectFormat(lines: string[]): { id: string; score: number } | null {
   const sample = lines.slice(0, 50);
   let best: { id: string; score: number } | null = null;
-  for (const p of PARSERS) {
+  for (const p of allParsers()) {
     const score = p.detect(sample);
     if (!best || score > best.score) best = { id: p.id, score };
   }
@@ -27,8 +42,9 @@ export function parseLogs(content: string, options: ParseOptions = {}): Processe
 
   const startIndex = options.startIndex ?? 0;
   const sample = lines.slice(0, 50);
+  const parsers = allParsers();
 
-  const ranked = PARSERS
+  const ranked = parsers
     .map((p) => ({ p, score: p.detect(sample) }))
     .sort((a, b) => b.score - a.score);
 
