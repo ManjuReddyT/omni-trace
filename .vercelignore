@@ -1,0 +1,6 @@
+tests
+e2e
+playwright-report
+test-results
+Dockerfile
+LOCAL_SETUP.md

@@ -39,6 +39,10 @@ docker run -d -p 8080:80 --name omnitrace omnitrace
 
 Open `http://localhost:8080`.
 
+## Vercel
+
+Vite static app (`vercel.json`). Grant the [Vercel GitHub app](https://github.com/apps/vercel) access to `omni-trace`, or import the repo at [vercel.com/new](https://vercel.com/new/import?s=https://github.com/ManjuReddyT/omni-trace). Pushes to `main` then deploy automatically.
+
 ## 🤖 Ollama Setup
 
 1. [Install Ollama](https://ollama.com/).
