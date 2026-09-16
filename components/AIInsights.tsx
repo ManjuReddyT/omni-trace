@@ -162,8 +162,8 @@ Always answer concisely and accurately.`;
 
         } else {
             // Gemini Streaming
-            const key = settings.geminiKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
-            if (!key) throw new Error("No Gemini API Key found in settings or environment.");
+            const key = settings.geminiKey;
+            if (!key) throw new Error("No Gemini API Key in Settings. Keys are not stored on disk — paste it again this session.");
             
             const ai = new GoogleGenAI({ apiKey: key });
             
@@ -222,6 +222,12 @@ Always answer concisely and accurately.`;
             </div>
         </div>
       </div>
+
+      {settings.aiProvider === 'gemini' && (
+        <div className="px-4 py-2 text-xs text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/20">
+          Cloud mode: summaries of the current view are sent to Google. Raw log files stay in this browser.
+        </div>
+      )}
 
       {/* Chat Area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-[#0a0f1e]">

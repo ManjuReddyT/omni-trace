@@ -1,0 +1,11 @@
+.git
+.github
+.vscode
+.idea
+node_modules
+dist
+coverage
+tests
+migrated_prompt_history
+*.local
+.DS_Store

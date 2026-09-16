@@ -4,21 +4,23 @@ import Dashboard from './components/Dashboard';
 import SettingsModal from './components/SettingsModal';
 import About from './components/About';
 import { parseLogs } from './utils';
-import { ProcessedLogEntry, AppSettings, DEFAULT_SETTINGS } from './types';
+import {
+  ProcessedLogEntry,
+  AppSettings,
+  SETTINGS_STORAGE_KEY,
+  loadSettings,
+  persistableSettings,
+} from './types';
 import { Settings, HelpCircle, ArrowLeft } from 'lucide-react';
 
 function App() {
   const [logs, setLogs] = useState<ProcessedLogEntry[] | null>(null);
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    // Try to load from local storage
-    const saved = localStorage.getItem('omnitrace_settings');
-    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
-  });
+  const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
   
   const [showSettings, setShowSettings] = useState(false);
   const [currentView, setCurrentView] = useState<'HOME' | 'ABOUT'>('HOME');
 
-  // Apply Theme
+  // Apply Theme — persist everything except the Gemini API key
   useEffect(() => {
     const root = window.document.documentElement;
     if (settings.theme === 'dark') {
@@ -26,7 +28,7 @@ function App() {
     } else {
         root.classList.remove('dark');
     }
-    localStorage.setItem('omnitrace_settings', JSON.stringify(settings));
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(persistableSettings(settings)));
   }, [settings]);
 
   const handleDataLoaded = useCallback((content: string, isAppend: boolean = false) => {

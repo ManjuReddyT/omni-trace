@@ -84,8 +84,31 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'light',
-  aiProvider: 'gemini',
+  aiProvider: 'ollama',
   geminiKey: '',
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'llama3',
 };
+
+export const SETTINGS_STORAGE_KEY = 'omnitrace_settings';
+
+/** Persist settings without the Gemini API key (never write secrets to localStorage). */
+export function persistableSettings(settings: AppSettings): Omit<AppSettings, 'geminiKey'> {
+  const { geminiKey: _omit, ...rest } = settings;
+  return rest;
+}
+
+export function loadSettings(): AppSettings {
+  try {
+    const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!saved) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(saved);
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      geminiKey: '',
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
